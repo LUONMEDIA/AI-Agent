@@ -37,6 +37,8 @@ class Item:
         payload = {
             "product": self.product_class,
             "number": self.document_number,
+            "item_id": self.item_id,
+            "title": self.title,
             "module": self.target_module,
             "source_sha256": self.source_sha256,
             "fields": self.fields,
@@ -138,7 +140,7 @@ def load_batch(manifest_path: str | Path) -> Batch:
     return Batch(case_id=case_id, items=tuple(items))
 
 
-def check_permission(batch: Batch, item: Item, permit: dict[str, Any]) -> None:
+def check_permission(batch: Batch, item: Item, permit: dict[str, Any], target_origin: str | None) -> None:
     if permit.get("case_id") != batch.case_id:
         raise Hold("WRONG_CASE_APPROVAL")
     approval_id = _required_str(permit, "approval_id")
@@ -155,6 +157,8 @@ def check_permission(batch: Batch, item: Item, permit: dict[str, Any]) -> None:
         raise Hold("ITEM_FINGERPRINT_NOT_APPROVED")
     if item.target_module not in permit["allowed_modules"]:
         raise Hold("MODULE_NOT_APPROVED")
+    if not isinstance(target_origin, str) or permit["target_origin"] != target_origin:
+        raise Hold("CMS_ORIGIN_NOT_APPROVED")
     if item.action == "PUBLISH_STEP1" and item.product_class != "CSDL":
         if item.item_id not in permit["explicit_news_publish_item_ids"]:
             raise Hold("NEWS_PUBLISH_NEEDS_SEPARATE_EXPLICIT_APPROVAL")
@@ -175,7 +179,7 @@ def _assert_readback(item: Item, record: RemoteRecord, status: str) -> None:
 def execute_item(batch: Batch, item: Item, permit: dict[str, Any], adapter: CMSAdapter) -> dict[str, str]:
     base = {"item_id": item.item_id, "action": item.action}
     try:
-        check_permission(batch, item, permit)
+        check_permission(batch, item, permit, getattr(adapter, 'origin', None))
         matches = adapter.find(item)
         if len(matches) > 1:
             raise Hold("MULTIPLE_REMOTE_MATCHES")

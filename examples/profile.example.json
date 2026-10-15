@@ -5,11 +5,13 @@
   "create_url": "https://cms.example.invalid/REPLACE_CREATE",
   "draft_states": ["REPLACE_WITH_VERIFIED_DRAFT_TEXT"],
   "published_states": ["REPLACE_WITH_VERIFIED_PUBLIC_TEXT"],
+  "forwarded_states": ["REPLACE_WITH_VERIFIED_FORWARDED_TEXT"],
   "max_attachment_bytes": 25000000,
   "selectors": {
     "module_marker": "REPLACE",
     "search_input": "REPLACE",
     "search_submit": "REPLACE",
+    "search_done_marker": "REPLACE_WITH_VERIFIED_SEARCH_COMPLETE_STATE",
     "search_rows": "REPLACE",
     "row_number": "REPLACE",
     "row_detail_link": "REPLACE",

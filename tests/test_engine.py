@@ -47,7 +47,8 @@ class EngineTests(unittest.TestCase):
             "expires_at": (now + timedelta(hours=1)).isoformat(),
             "item_actions": {"synthetic-1": "PUBLISH_STEP1"},
             "item_fingerprints": {},
-            "allowed_modules": ["TEST_MODULE"], "explicit_news_publish_item_ids": []
+            "allowed_modules": ["TEST_MODULE"], "explicit_news_publish_item_ids": [],
+            "target_origin": "https://synthetic.invalid"
         }
         self.live = patch.dict(os.environ, {
             "CMS_AGENT_ENABLE_LIVE": "YES",
@@ -185,7 +186,7 @@ class EngineTests(unittest.TestCase):
 
     def test_expired_approval_holds(self):
         permit = dict(self.permit, expires_at="2020-01-01T00:00:00Z")
-        self.assertEqual(self.run_item(MockCMS(), permit)["reason"], "APPROVAL_EXPIRED")
+        self.assertEqual(self.run_item(MockCMS(), permit)["reason"], "APPROVAL_EXPIRED_NOT_YET_VALID_OR_TOO_LONG")
 
     def test_signature_tamper_blocks(self):
         batch = self.load()
@@ -245,6 +246,34 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.run_item(cms, permit)["reason"], "APPROVAL_INVALID_ITEM_ACTIONS")
         permit = dict(self.permit, allowed_modules=["OTHER_MODULE"])
         self.assertEqual(self.run_item(cms, permit)["reason"], "MODULE_NOT_APPROVED")
+        self.assertEqual(cms.created, 0)
+
+    def test_title_drift_blocks(self):
+        before = self.seal(self.permit)
+        self.template["items"][0]["title"] = "Modified after operator approval"
+        self.write()
+        batch = self.load()
+        cms = MockCMS()
+        with self.live:
+            result = execute_item(batch, batch.items[0], before, cms)
+        self.assertEqual(result["reason"], "ITEM_FINGERPRINT_NOT_APPROVED")
+        self.assertEqual(cms.created, 0)
+
+    def test_unapproved_portal_origin_blocks(self):
+        class OtherPortal(MockCMS):
+            origin = "https://other.invalid"
+        cms = OtherPortal()
+        self.assertEqual(self.run_item(cms)["reason"], "CMS_ORIGIN_NOT_APPROVED")
+        self.assertEqual(cms.created, 0)
+
+    def test_signed_origin_tamper_blocks(self):
+        permit = self.seal(self.permit)
+        permit["target_origin"] = "https://other.invalid"
+        batch = self.load()
+        cms = MockCMS()
+        with self.live:
+            result = execute_item(batch, batch.items[0], permit, cms)
+        self.assertEqual(result["reason"], "APPROVAL_SIGNATURE_INVALID")
         self.assertEqual(cms.created, 0)
 
 

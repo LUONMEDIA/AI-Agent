@@ -6,6 +6,8 @@ from .engine import Item, RemoteRecord
 
 
 class MockCMS:
+    origin = 'https://synthetic.invalid'
+
     def __init__(self):
         self.records: dict[str, RemoteRecord] = {}
         self.created = 0

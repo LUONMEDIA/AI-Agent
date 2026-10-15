@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 from typing import Any
+from urllib.parse import urlparse
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -23,7 +24,7 @@ class ApprovalError(ValueError):
 APPROVAL_KEYS = frozenset({
     "schema_version", "purpose", "case_id", "approval_id", "operator_id",
     "issued_at", "expires_at", "item_actions", "item_fingerprints",
-    "allowed_modules", "explicit_news_publish_item_ids", "signature",
+    "allowed_modules", "explicit_news_publish_item_ids", "target_origin", "signature",
 })
 
 
@@ -61,6 +62,12 @@ def verify_operator_approval(approval: dict[str, Any]) -> None:
         raise ApprovalError("APPROVAL_INVALID_MODULES")
     if not isinstance(approval.get("explicit_news_publish_item_ids"), list):
         raise ApprovalError("APPROVAL_INVALID_NEWS_LIST")
+    origin = approval.get("target_origin")
+    if not isinstance(origin, str) or not origin or origin != origin.rstrip("/"):
+        raise ApprovalError("APPROVAL_ORIGIN_INVALID")
+    u = urlparse(origin)
+    if u.scheme != "https" or not u.hostname or u.username or u.password or u.path or u.query or u.fragment:
+        raise ApprovalError("APPROVAL_ORIGIN_INVALID")
     now = datetime.now(timezone.utc)
     issued, expires = _time(approval.get("issued_at")), _time(approval.get("expires_at"))
     if issued > now or expires <= now or expires - issued > timedelta(hours=8):

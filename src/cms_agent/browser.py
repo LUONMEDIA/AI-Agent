@@ -34,7 +34,7 @@ class BrowserCMS:
         self.selectors = self.config.get("selectors")
         if not isinstance(self.selectors, dict):
             raise Hold("SELECTORS_NOT_CONFIGURED")
-        for key in ("module_marker", "search_input", "search_submit", "search_rows",
+        for key in ("module_marker", "search_input", "search_submit", "search_done_marker", "search_rows",
                     "row_number", "row_detail_link", "number_detail",
                     "module_detail", "fingerprint_detail", "status_detail",
                     "attachment_link", "form_number", "form_title",
@@ -114,6 +114,7 @@ class BrowserCMS:
         self._goto(self._url("search_url"))
         self.page.locator(self._selector("search_input")).fill(item.document_number)
         self.page.locator(self._selector("search_submit")).click()
+        self.page.locator(self._selector("search_done_marker")).wait_for(state="visible", timeout=15000)
         self._assert_module()
         next_page = self.selectors.get("pagination_next")
         if next_page:
@@ -199,9 +200,14 @@ class BrowserCMS:
             raise Hold("RECORD_NOT_DRAFT_BEFORE_APPROVAL")
         # Workflow-specific approval transitions must be mapped and verified
         # with a real test system before profile is permitted in production.
+        if not isinstance(self.config.get("forwarded_states"), list) or not self.config["forwarded_states"]:
+            raise Hold("FORWARDED_STATES_NOT_CONFIGURED")
         self.page.locator(self._selector("forward_button")).click()
         self.page.wait_for_load_state("domcontentloaded")
         self._assert_origin(self.page.url)
+        self._assert_module()
+        if self._text("status_detail") not in self.config["forwarded_states"]:
+            raise Hold("FORWARDED_STATE_NOT_VERIFIED")
         self.page.locator(self._selector("approve_button")).click()
         self.page.wait_for_load_state("domcontentloaded")
         self._assert_origin(self.page.url)

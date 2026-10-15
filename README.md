@@ -6,7 +6,7 @@ Framework for preparing and verifying document uploads to a CMS. Designed for Co
 
 - Offline PDF source lock: verify file is PDF, restrict source root, SHA-256 check.
 - Separate product classes: CSDL, TIN_VAN, TIN_BAI, TIN_SU_KIEN.
-- Ed25519 signed operator approval: bind case, item fingerprint, action, CMS module and expiry (max 8 hours); execution environment holds only trusted PUBLIC verification key. The private signing key remains with the independent authorizer.
+- Ed25519 signed operator approval: bind case, item fingerprint (including title, metadata and PDF hash), action, CMS module, HTTPS target origin and expiry (max 8 hours); executor holds only trusted PUBLIC verification key. The private signing key remains with the independent authorizer.
 - TIN_VAN / articles: publish only with an additional exact-item permission; otherwise SAVE_DRAFT.
 - CMS adapter contract: remote duplicate lookup before CREATE; compare fingerprint and downloaded attachment SHA; verify DRAFT before proceeding; verify PUBLISHED after step 1.
 - HOLD for missing scope/conflicting record, NEEDS_RECONCILE for uncertain write outcome (never blindly retry).
@@ -56,7 +56,7 @@ This command is read-only and makes no CMS requests. A file check can fail close
     export CMS_AGENT_APPROVAL_PUBLIC_KEY_B64=OPERATOR_PUBLIC_ED25519_KEY_BASE64
     cms-batch private/batch.json --live --approval-file /secure/approved-case.json --adapter cms_agent.browser.BrowserCMS
 
-The browser workflow assumes a CMS supports a searchable document number, a persistent fingerprint field, a downloadable PDF, and separate Forward and Approve controls. If any are missing, the adapter **must not be used** until adapted and reviewed for that particular CMS.
+The browser workflow assumes a CMS supports a searchable document number, verified search-complete marker, persistent fingerprint field, downloadable PDF, verified intermediate Forward status and separate Forward and Approve controls. If any are missing, the adapter **must not be used** until adapted and reviewed for that particular CMS.
 
 One profile represents ONE verified CMS module. Split mixed-product batches by module before execution. There is no production API URL/endpoint, selector map, or credential in this repository.
 
