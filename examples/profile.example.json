@@ -1,0 +1,33 @@
+{
+  "origin": "https://cms.example.invalid",
+  "module": "REPLACE_WITH_VERIFIED_MODULE_LABEL",
+  "search_url": "https://cms.example.invalid/REPLACE_SEARCH",
+  "create_url": "https://cms.example.invalid/REPLACE_CREATE",
+  "draft_states": ["REPLACE_WITH_VERIFIED_DRAFT_TEXT"],
+  "published_states": ["REPLACE_WITH_VERIFIED_PUBLIC_TEXT"],
+  "max_attachment_bytes": 25000000,
+  "selectors": {
+    "module_marker": "REPLACE",
+    "search_input": "REPLACE",
+    "search_submit": "REPLACE",
+    "search_rows": "REPLACE",
+    "row_number": "REPLACE",
+    "row_detail_link": "REPLACE",
+    "pagination_next": "",
+    "number_detail": "REPLACE",
+    "module_detail": "REPLACE",
+    "fingerprint_detail": "REPLACE",
+    "status_detail": "REPLACE",
+    "attachment_link": "REPLACE",
+    "form_number": "REPLACE",
+    "form_title": "REPLACE",
+    "form_fingerprint": "REPLACE",
+    "form_pdf": "REPLACE",
+    "save_button": "REPLACE",
+    "forward_button": "REPLACE",
+    "approve_button": "REPLACE"
+  },
+  "metadata_fields": {
+    "category": "REPLACE"
+  }
+}

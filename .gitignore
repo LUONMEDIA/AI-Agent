@@ -1,0 +1,25 @@
+# Credentials, auth state, documents, runtime logs: NEVER COMMIT
+.env
+.env.*
+!.env.example
+.auth/
+private/
+secrets/
+data/
+runtime/
+*.sqlite3
+*.db
+*storage_state*.json
+*approval*.private.json
+*.pdf
+*.docx
+*.p12
+*.pem
+*.key
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
