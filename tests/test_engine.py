@@ -322,12 +322,39 @@ class EngineTests(unittest.TestCase):
         from contextlib import redirect_stdout
         from io import StringIO
         output = StringIO()
-        with redirect_stdout(output):
-            status = main([str(self.manifest), "--live", "--adapter",
-                           "cms_agent.mock.MockCMS", "--approval-file",
-                           str(self.manifest)])
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "", "CI": "false"}):
+            with redirect_stdout(output):
+                status = main([str(self.manifest), "--live", "--adapter",
+                               "cms_agent.mock.MockCMS", "--approval-file",
+                               str(self.manifest)])
         self.assertEqual(status, 2)
         self.assertIn("UNREVIEWED_LIVE_ADAPTER_BLOCKED", output.getvalue())
+
+    def test_cli_always_blocks_live_inside_ci(self):
+        from cms_agent.cli import main
+        from contextlib import redirect_stdout
+        from io import StringIO
+        out = StringIO()
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
+            with redirect_stdout(out):
+                code = main([str(self.manifest), "--live", "--adapter",
+                             "cms_agent.browser.BrowserCMS", "--approval-file",
+                             str(self.manifest)])
+        self.assertEqual(code, 2)
+        self.assertIn("LIVE_FORBIDDEN_IN_CI", out.getvalue())
+
+    def test_audit_symlink_destination_blocks(self):
+        from cms_agent.runner import PrivateAudit
+        from cms_agent.engine import Hold
+        secure = self.root / "private-audit"
+        secure.mkdir(mode=0o700)
+        target = secure / "actual.jsonl"
+        target.write_text("")
+        target.chmod(0o600)
+        link = secure / "link.jsonl"
+        link.symlink_to(target)
+        with self.assertRaisesRegex(Hold, "AUDIT_SYMLINK_FORBIDDEN"):
+            PrivateAudit(link)
 
 
 if __name__ == "__main__":

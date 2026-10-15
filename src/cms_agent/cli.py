@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 
-from .engine import load_batch, dry_run, Hold
+from .engine import load_batch, dry_run, Hold, check_permission
 from .runner import PrivateAudit, run_batch
 
 
@@ -38,6 +38,10 @@ def main(argv: list[str] | None = None) -> int:
             raise Hold("PRIVATE_AUDIT_PATH_REQUIRED")
         audit = PrivateAudit(audit_path)
         approval = json.loads(args.approval_file.read_text(encoding="utf-8"))
+        if not isinstance(approval, dict):
+            raise Hold("APPROVAL_NOT_OBJECT")
+        for item in batch.items:
+            check_permission(batch, item, approval, approval.get("target_origin"))
         module_name, _, class_name = args.adapter.rpartition(".")
         adapter_type = getattr(importlib.import_module(module_name), class_name)
         adapter = adapter_type()

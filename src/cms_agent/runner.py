@@ -27,6 +27,8 @@ class PrivateAudit:
         file = Path(path)
         if not file.is_absolute():
             raise Hold("AUDIT_PATH_MUST_BE_ABSOLUTE")
+        if file.is_symlink():
+            raise Hold("AUDIT_SYMLINK_FORBIDDEN")
         self.path = file.resolve()
         if not self.path.parent.is_dir():
             raise Hold("AUDIT_PARENT_MISSING")
