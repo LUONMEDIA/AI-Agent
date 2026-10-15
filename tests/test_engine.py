@@ -1,4 +1,5 @@
 import base64
+import dataclasses
 import hashlib
 import json
 import os
@@ -275,6 +276,58 @@ class EngineTests(unittest.TestCase):
             result = execute_item(batch, batch.items[0], permit, cms)
         self.assertEqual(result["reason"], "APPROVAL_SIGNATURE_INVALID")
         self.assertEqual(cms.created, 0)
+
+    def test_batch_stops_on_uncertain_mutation(self):
+        from cms_agent.runner import run_batch
+        from cms_agent.engine import Batch
+        batch = self.load()
+        duplicate = dataclasses.replace(batch.items[0], item_id="synthetic-2")
+        many = Batch(batch.case_id, (batch.items[0], duplicate))
+        class TimeoutCMS(MockCMS):
+            def create_draft(self, item):
+                super().create_draft(item)
+                raise RuntimeError("ambiguous save timeout")
+        cms = TimeoutCMS()
+        audit = []
+        with self.live:
+            signed = self.seal(self.permit, batch)
+            results = run_batch(many, signed, cms, lambda *args: audit.append(args))
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["status"], "NEEDS_RECONCILE")
+        self.assertEqual([r[2] for r in audit], ["BEFORE_REMOTE", "AFTER_REMOTE"])
+        self.assertEqual(cms.created, 1)
+
+    def test_private_audit_writes_two_events_with_no_raw_case(self):
+        from cms_agent.runner import PrivateAudit
+        secure = self.root / "secure"
+        secure.mkdir(mode=0o700)
+        sink = PrivateAudit(secure / "events.jsonl")
+        sink("TEST-ONLY", "synthetic-1", "BEFORE_REMOTE", "START", "")
+        sink("TEST-ONLY", "synthetic-1", "AFTER_REMOTE", "DRAFT_VERIFIED", "")
+        raw = (secure / "events.jsonl").read_text()
+        self.assertNotIn("TEST-ONLY", raw)
+        self.assertEqual(len(raw.splitlines()), 2)
+
+    def test_private_audit_blocks_world_readable_dir(self):
+        from cms_agent.runner import PrivateAudit
+        from cms_agent.engine import Hold
+        weak = self.root / "weak"
+        weak.mkdir()
+        weak.chmod(0o755)
+        with self.assertRaisesRegex(Hold, "PERMISSIONS_TOO_OPEN"):
+            PrivateAudit(weak / "audit.jsonl")
+
+    def test_cli_rejects_mock_live_adapter(self):
+        from cms_agent.cli import main
+        from contextlib import redirect_stdout
+        from io import StringIO
+        output = StringIO()
+        with redirect_stdout(output):
+            status = main([str(self.manifest), "--live", "--adapter",
+                           "cms_agent.mock.MockCMS", "--approval-file",
+                           str(self.manifest)])
+        self.assertEqual(status, 2)
+        self.assertIn("UNREVIEWED_LIVE_ADAPTER_BLOCKED", output.getvalue())
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ Framework for preparing and verifying document uploads to a CMS. Designed for Co
 - CMS adapter contract: remote duplicate lookup before CREATE; compare fingerprint and downloaded attachment SHA; verify DRAFT before proceeding; verify PUBLISHED after step 1.
 - HOLD for missing scope/conflicting record, NEEDS_RECONCILE for uncertain write outcome (never blindly retry).
 - Mock CMS + unit tests; GitHub Actions offline-only; dry-run CLI does not instantiate a CMS adapter.
+- LIVE runner adds private append+fsync audit events before/after each item and stops the batch immediately after uncertain remote writes; local audit directory must be owner-only (0700).
 - Optional Playwright BrowserCMS adapter with private verified selector profile and auth snapshot. **Untested against target CMS; use only after staging validation.**
 
 ## Architecture
@@ -54,6 +55,7 @@ This command is read-only and makes no CMS requests. A file check can fail close
     export CMS_AGENT_ENABLE_LIVE=YES
     export CMS_AGENT_APPROVAL_ID=AN_EXACT_REVIEWED_APPROVAL_ID
     export CMS_AGENT_APPROVAL_PUBLIC_KEY_B64=OPERATOR_PUBLIC_ED25519_KEY_BASE64
+    export CMS_AGENT_AUDIT_PATH=/secure/private-audit/events.jsonl
     cms-batch private/batch.json --live --approval-file /secure/approved-case.json --adapter cms_agent.browser.BrowserCMS
 
 The browser workflow assumes a CMS supports a searchable document number, verified search-complete marker, persistent fingerprint field, downloadable PDF, verified intermediate Forward status and separate Forward and Approve controls. If any are missing, the adapter **must not be used** until adapted and reviewed for that particular CMS.
@@ -71,7 +73,7 @@ Connect the AI-Agent repository to a Codex Cloud environment. Configure Python/t
 - [ ] Real authenticated staging search, upload, readback and PDF byte hash verification
 - [x] Ed25519 signature verification for exact case, module, action and item fingerprint (synthetic CI tests)
 - [ ] Independent authorized private signing service, trusted key provisioning and revocation operational process
-- [ ] Independent CMS Step 1 staging smoke test and audit retention plan
+- [ ] Independent CMS Step 1 staging smoke test and independent review of audit retention / reconciliation plan
 - [ ] Production allowlist, protected deployment environment and operator approval
 - [ ] Separate Step 2 public QA / QLVB workflow
 
