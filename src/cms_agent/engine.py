@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Protocol
 import json
 import os
+from .approval import ApprovalError, verify_operator_approval
 
 
 PRODUCTS = {"CSDL", "TIN_VAN", "TIN_BAI", "TIN_SU_KIEN"}
@@ -144,23 +145,21 @@ def check_permission(batch: Batch, item: Item, permit: dict[str, Any]) -> None:
     if os.getenv("CMS_AGENT_ENABLE_LIVE") != "YES" or os.getenv("CMS_AGENT_APPROVAL_ID") != approval_id:
         raise Hold("LIVE_EXECUTION_NOT_ACKNOWLEDGED")
     try:
-        expiry = datetime.fromisoformat(_required_str(permit, "expires_at").replace("Z", "+00:00"))
-    except ValueError as error:
-        raise Hold("INVALID_APPROVAL_EXPIRY") from error
-    if expiry.tzinfo is None or expiry <= datetime.now(timezone.utc):
-        raise Hold("APPROVAL_EXPIRED")
-    item_actions = permit.get("item_actions")
-    if not isinstance(item_actions, dict) or item_actions.get(item.item_id) != item.action:
+        verify_operator_approval(permit)
+    except ApprovalError as error:
+        raise Hold(str(error)) from error
+    actions = permit["item_actions"]
+    if actions.get(item.item_id) != item.action:
         raise Hold("ACTION_NOT_APPROVED_EXACT_ITEM")
-    modules = permit.get("allowed_modules")
-    if not isinstance(modules, list) or item.target_module not in modules:
+    if permit["item_fingerprints"].get(item.item_id) != item.fingerprint:
+        raise Hold("ITEM_FINGERPRINT_NOT_APPROVED")
+    if item.target_module not in permit["allowed_modules"]:
         raise Hold("MODULE_NOT_APPROVED")
     if item.action == "PUBLISH_STEP1" and item.product_class != "CSDL":
-        ids = permit.get("explicit_news_publish_item_ids")
-        if not isinstance(ids, list) or item.item_id not in ids:
+        if item.item_id not in permit["explicit_news_publish_item_ids"]:
             raise Hold("NEWS_PUBLISH_NEEDS_SEPARATE_EXPLICIT_APPROVAL")
-    # A local JSON file is not a cryptographic signature. The operator must
-    # protect the approval source and activate the exact approval ID.
+    # Verified operator-signed exact item/content/action/module permission.
+    # Never treat this as permission for public QA or QLVB Step 2.
 
 
 def _assert_readback(item: Item, record: RemoteRecord, status: str) -> None:

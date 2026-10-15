@@ -1,8 +1,14 @@
 {
+  "schema_version": 2,
+  "purpose": "CMS_STEP1",
   "case_id": "SYNTHETIC-TEST-ONLY",
   "approval_id": "REPLACE_WITH_OPERATOR_APPROVAL_ID",
-  "expires_at": "2030-01-01T00:00:00+00:00",
+  "operator_id": "VERIFIED_AUTHORIZER_IDENTIFIER",
+  "issued_at": "REPLACE_WITH_APPROVED_UTC_ISSUE_TIME",
+  "expires_at": "REPLACE_WITH_EXPIRY_WITHIN_8_HOURS",
   "item_actions": {"demo-001": "PUBLISH_STEP1"},
+  "item_fingerprints": {"demo-001": "REPLACE_WITH_EXACT_FINGERPRINT_FROM_DRY_RUN"},
   "allowed_modules": ["REPLACE_WITH_VERIFIED_MODULE_LABEL"],
-  "explicit_news_publish_item_ids": []
+  "explicit_news_publish_item_ids": [],
+  "signature": "REPLACE_WITH_OFFLINE_OPERATOR_ED25519_BASE64_SIGNATURE"
 }

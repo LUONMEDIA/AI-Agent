@@ -6,7 +6,7 @@ Framework for preparing and verifying document uploads to a CMS. Designed for Co
 
 - Offline PDF source lock: verify file is PDF, restrict source root, SHA-256 check.
 - Separate product classes: CSDL, TIN_VAN, TIN_BAI, TIN_SU_KIEN.
-- Per-item/target-module operator approval checks and expiry.
+- Ed25519 signed operator approval: bind case, item fingerprint, action, CMS module and expiry (max 8 hours); execution environment holds only trusted PUBLIC verification key. The private signing key remains with the independent authorizer.
 - TIN_VAN / articles: publish only with an additional exact-item permission; otherwise SAVE_DRAFT.
 - CMS adapter contract: remote duplicate lookup before CREATE; compare fingerprint and downloaded attachment SHA; verify DRAFT before proceeding; verify PUBLISHED after step 1.
 - HOLD for missing scope/conflicting record, NEEDS_RECONCILE for uncertain write outcome (never blindly retry).
@@ -46,13 +46,14 @@ This command is read-only and makes no CMS requests. A file check can fail close
 2. Otherwise, inspect a staging CMS with a legitimate operator account. Capture the exact module URLs, selectors, status labels, fingerprint metadata field, and link that downloads the actual PDF.
 3. Configure a private profile from examples/profile.example.json. All placeholder REPLACE values must be verified against that CMS. Provide an authenticated Playwright storage-state file **outside Git**. Never share cookies into an untrusted/public workspace.
 4. Install optional browser support: pip install -e '.[browser]' and python -m playwright install chromium.
-5. Review an item-scoped private approval JSON (see examples/approval.example.json); this file is NOT a cryptographically signed permit. Production should use externally validated approvals and least-privilege role controls.
+5. Generate an item-scoped Ed25519-signed approval using an INDEPENDENT trusted operator approval service, private key held entirely outside Codex and GitHub. Use canonical UTF-8 JSON per cms_agent.approval.canonical_bytes (sorted keys, compact separators, exclude signature), Ed25519 raw detached signature encoded Base64, schema_version=2. Keep the signed JSON outside Git. Supply only the approved public Ed25519 key as CMS_AGENT_APPROVAL_PUBLIC_KEY_B64 to the executor. A signature proves data integrity/approved key possession but does NOT replace authorized role checks in the CMS.
 6. Only after staging regression and independent human sign-off should the operator deliberately enable a live run; the following is a reference command, NOT a recommendation to use it in production immediately:
 
     export CMS_AGENT_PROFILE=/secure/profile.json
     export CMS_AGENT_AUTH_STATE=/secure/auth-state.json
     export CMS_AGENT_ENABLE_LIVE=YES
     export CMS_AGENT_APPROVAL_ID=AN_EXACT_REVIEWED_APPROVAL_ID
+    export CMS_AGENT_APPROVAL_PUBLIC_KEY_B64=OPERATOR_PUBLIC_ED25519_KEY_BASE64
     cms-batch private/batch.json --live --approval-file /secure/approved-case.json --adapter cms_agent.browser.BrowserCMS
 
 The browser workflow assumes a CMS supports a searchable document number, a persistent fingerprint field, a downloadable PDF, and separate Forward and Approve controls. If any are missing, the adapter **must not be used** until adapted and reviewed for that particular CMS.
@@ -68,9 +69,16 @@ Connect the AI-Agent repository to a Codex Cloud environment. Configure Python/t
 - [x] Code + mock tests + fail-closed gate
 - [ ] Production/staging API or selector discovery with authorization
 - [ ] Real authenticated staging search, upload, readback and PDF byte hash verification
-- [ ] Human-reviewable signed/externally verified approval mechanism
+- [x] Ed25519 signature verification for exact case, module, action and item fingerprint (synthetic CI tests)
+- [ ] Independent authorized private signing service, trusted key provisioning and revocation operational process
 - [ ] Independent CMS Step 1 staging smoke test and audit retention plan
 - [ ] Production allowlist, protected deployment environment and operator approval
 - [ ] Separate Step 2 public QA / QLVB workflow
 
 **Default release status: PILOT / NO_PRODUCTION_MUTATION.**
+
+## Approval authority boundary
+
+Signing and execution are separate trust domains. The operator (or secured approval service) reviews the case, exact item fingerprints from dry-run, CSDL/tin-vắn product, actions, module and expiry, and signs the canonical bytes offline using Ed25519. This repository deliberately does not include a production signer. Tests use ephemeral fake Ed25519 keys; those are not production credentials. Store and provision a trusted public key outside GitHub. A compromised signer or deployment environment still requires a separate security incident/revocation process.
+
+An approval is not an authorization to use a CMS account whose permissions were never independently granted, and does not authorize Step 2, QLVB reports or signing administrative PDFs.

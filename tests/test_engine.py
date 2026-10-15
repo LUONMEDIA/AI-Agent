@@ -1,9 +1,14 @@
+import base64
 import hashlib
 import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cms_agent.approval import canonical_bytes
 from unittest.mock import patch
 
 from cms_agent.engine import Hold, load_batch, dry_run, execute_item, RemoteRecord
@@ -30,16 +35,37 @@ class EngineTests(unittest.TestCase):
                        "fields": {"category": "mock"}, "action": "PUBLISH_STEP1"}]
         }
         self.write()
+        self.signing_key = Ed25519PrivateKey.generate()  # TEST ONLY, ephemeral
+        pub = self.signing_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        self.trusted_pub = base64.b64encode(pub).decode()
+        now = datetime.now(timezone.utc)
         self.permit = {
+            "schema_version": 2, "purpose": "CMS_STEP1",
             "case_id": "TEST-ONLY", "approval_id": "ACK-TEST-ONLY",
-            "expires_at": "2099-01-01T00:00:00+00:00",
+            "operator_id": "SYNTHETIC_OPERATOR",
+            "issued_at": (now - timedelta(minutes=1)).isoformat(),
+            "expires_at": (now + timedelta(hours=1)).isoformat(),
             "item_actions": {"synthetic-1": "PUBLISH_STEP1"},
+            "item_fingerprints": {},
             "allowed_modules": ["TEST_MODULE"], "explicit_news_publish_item_ids": []
         }
         self.live = patch.dict(os.environ, {
             "CMS_AGENT_ENABLE_LIVE": "YES",
-            "CMS_AGENT_APPROVAL_ID": "ACK-TEST-ONLY"
+            "CMS_AGENT_APPROVAL_ID": "ACK-TEST-ONLY",
+            "CMS_AGENT_APPROVAL_PUBLIC_KEY_B64": self.trusted_pub,
         })
+
+    def seal(self, permit, batch=None):
+        item = (batch or self.load()).items[0]
+        to_sign = dict(permit)
+        to_sign["item_fingerprints"] = dict(to_sign.get("item_fingerprints", {}))
+        if not to_sign["item_fingerprints"]:
+            to_sign["item_fingerprints"][item.item_id] = item.fingerprint
+        to_sign.pop("signature", None)
+        to_sign["signature"] = base64.b64encode(
+            self.signing_key.sign(canonical_bytes(to_sign))
+        ).decode()
+        return to_sign
 
     def write(self):
         self.manifest.write_text(json.dumps(self.template), encoding="utf-8")
@@ -50,7 +76,7 @@ class EngineTests(unittest.TestCase):
     def run_item(self, cms=None, permit=None):
         batch = self.load()
         with self.live:
-            return execute_item(batch, batch.items[0], permit or self.permit, cms or MockCMS())
+            return execute_item(batch, batch.items[0], self.seal(permit or self.permit, batch), cms or MockCMS())
 
     def test_dry_run_only_plans(self):
         plan = dry_run(self.load())
@@ -160,6 +186,66 @@ class EngineTests(unittest.TestCase):
     def test_expired_approval_holds(self):
         permit = dict(self.permit, expires_at="2020-01-01T00:00:00Z")
         self.assertEqual(self.run_item(MockCMS(), permit)["reason"], "APPROVAL_EXPIRED")
+
+    def test_signature_tamper_blocks(self):
+        batch = self.load()
+        signed = self.seal(self.permit, batch)
+        signed["item_actions"]["synthetic-1"] = "SAVE_DRAFT"
+        cms = MockCMS()
+        with self.live:
+            result = execute_item(batch, batch.items[0], signed, cms)
+        self.assertEqual(result["reason"], "APPROVAL_SIGNATURE_INVALID")
+        self.assertEqual(cms.created, 0)
+
+    def test_signed_content_fingerprint_drift_blocks(self):
+        batch = self.load()
+        old_permit = self.seal(self.permit, batch)
+        self.template["items"][0]["fields"]["category"] = "updated"
+        self.write()
+        new_batch = self.load()
+        cms = MockCMS()
+        with self.live:
+            result = execute_item(new_batch, new_batch.items[0], old_permit, cms)
+        self.assertEqual(result["reason"], "ITEM_FINGERPRINT_NOT_APPROVED")
+        self.assertEqual(cms.created, 0)
+
+    def test_unsigned_approval_holds(self):
+        batch = self.load()
+        cms = MockCMS()
+        permit = self.seal(self.permit)
+        permit["signature"] = ""
+        with self.live:
+            result = execute_item(batch, batch.items[0], permit, cms)
+        self.assertEqual(result["reason"], "APPROVAL_SIGNATURE_INVALID")
+        self.assertEqual(cms.created, 0)
+
+    def test_public_key_missing_holds(self):
+        batch = self.load()
+        permit = self.seal(self.permit)
+        cms = MockCMS()
+        with patch.dict(os.environ, {
+            "CMS_AGENT_ENABLE_LIVE": "YES",
+            "CMS_AGENT_APPROVAL_ID": "ACK-TEST-ONLY",
+            "CMS_AGENT_APPROVAL_PUBLIC_KEY_B64": ""
+        }):
+            result = execute_item(batch, batch.items[0], permit, cms)
+        self.assertEqual(result["reason"], "TRUSTED_APPROVAL_PUBLIC_KEY_MISSING")
+        self.assertEqual(cms.created, 0)
+
+    def test_future_or_overlong_approval_is_rejected(self):
+        now = datetime.now(timezone.utc)
+        permit = dict(self.permit, issued_at=(now + timedelta(minutes=5)).isoformat())
+        self.assertEqual(self.run_item(MockCMS(), permit)["status"], "HOLD")
+        permit = dict(self.permit, expires_at=(now + timedelta(days=2)).isoformat())
+        self.assertEqual(self.run_item(MockCMS(), permit)["status"], "HOLD")
+
+    def test_missing_action_or_module_is_fail_closed(self):
+        cms = MockCMS()
+        permit = dict(self.permit, item_actions={})
+        self.assertEqual(self.run_item(cms, permit)["reason"], "APPROVAL_INVALID_ITEM_ACTIONS")
+        permit = dict(self.permit, allowed_modules=["OTHER_MODULE"])
+        self.assertEqual(self.run_item(cms, permit)["reason"], "MODULE_NOT_APPROVED")
+        self.assertEqual(cms.created, 0)
 
 
 if __name__ == "__main__":

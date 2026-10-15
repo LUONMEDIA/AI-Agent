@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Safety-gated CMS batch executor with dry-run, exact permissions and readback"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["cryptography>=43"]
 
 [project.optional-dependencies]
 browser = ["playwright>=1.48,<2"]
