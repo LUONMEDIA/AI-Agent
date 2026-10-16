@@ -11,6 +11,7 @@ Framework for preparing and verifying document uploads to a CMS. Designed for Co
 - CMS adapter contract: remote duplicate lookup before CREATE; compare fingerprint and downloaded attachment SHA; verify DRAFT before proceeding; verify PUBLISHED after step 1.
 - HOLD for missing scope/conflicting record, NEEDS_RECONCILE for uncertain write outcome (never blindly retry).
 - Mock CMS + unit tests; GitHub Actions offline-only; dry-run CLI does not instantiate a CMS adapter.
+- A GitHub CI guard rejects sensitive file types, private runtime paths, token-shaped strings, non-text binaries and committed environment files in this PUBLIC repo.
 - LIVE runner adds private append+fsync audit events before/after each item and stops the batch immediately after any HOLD or uncertain remote write; local audit directory must be owner-only (0700).
 - ExclusiveRunLock prevents two workers on the same machine; cross-machine/cloud concurrency requires a separately verified CMS-side idempotency key or distributed lock before production.
 - Optional Playwright BrowserCMS adapter with private verified STAGING-only selector profile and auth snapshot. **Untested against target CMS; use only after staging validation.**

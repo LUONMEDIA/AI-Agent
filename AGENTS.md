@@ -2,7 +2,7 @@
 
 Scope: develop/test the software framework only; never assume permission to access or modify a real CMS.
 
-1. This repository is PUBLIC. No account names, passwords, tokens, cookies, private portal URLs, signed documents, real case metadata, approval manifests, or production auth snapshots may be committed.
+1. This repository is PUBLIC. No account names, passwords, tokens, cookies, private portal URLs, signed documents, real case metadata, approval manifests, or production auth snapshots may be committed. Run `python scripts/scan_public_repository.py` before committing; this is an extra defense, not a guarantee.
 2. Always start with python -m unittest discover -s tests -v, and use synthetic source PDFs.
 3. DRY_RUN is the default. GitHub Actions must remain offline and must NEVER receive production CMS credentials or trigger publication.
 4. A real CMS adapter requires verified selectors/API, explicit target module, authenticated authorization scope, duplicate search, full PDF hash readback, and verified publish status; any uncertainty is HOLD / NEEDS_RECONCILE, never silent retry.
