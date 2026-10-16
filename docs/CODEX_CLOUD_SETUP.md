@@ -1,6 +1,6 @@
 # Codex Cloud — pilot setup for LUONMEDIA/AI-Agent
 
-This repository can be attached to Codex Cloud by an authorized user via the Codex Cloud UI. GitHub access alone does NOT create a Codex Cloud environment.
+This repository can be attached to Codex Cloud by an authorized user via the Codex Cloud UI. GitHub access alone does NOT create a Codex Cloud environment. Do not mistake a green GitHub Actions workflow for a cloud Codex environment or an authenticated CMS staging test.
 
 ## Environment
 - Repository: LUONMEDIA/AI-Agent, branch feat/cms-batch-agent-safety-first while under review.

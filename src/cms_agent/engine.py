@@ -229,7 +229,9 @@ def execute_item(batch: Batch, item: Item, permit: dict[str, Any], adapter: CMSA
                 return {**base, "status": "NEEDS_RECONCILE", "reason": "POST_CREATE_READBACK_UNVERIFIED"}
             if item.action == "SAVE_DRAFT":
                 return {**base, "status": "DRAFT_VERIFIED", "record_id": record_id}
-        # Revalidate signed source before APPROVE, including resumed drafts.
+        # Revalidate signed authority and PDF just before APPROVE; an operator
+        # may revoke the execution acknowledgment while a draft is being saved.
+        check_permission(batch, item, permit, getattr(adapter, "origin", None))
         _verify_local_source(item)
         try:
             _assert_readback(item, adapter.readback(record_id), "DRAFT")

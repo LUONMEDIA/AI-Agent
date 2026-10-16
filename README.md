@@ -6,7 +6,7 @@ Framework for preparing and verifying document uploads to a CMS. Designed for Co
 
 - Offline PDF source lock: verify file is PDF, restrict source root, SHA-256 check.
 - Separate product classes: CSDL, TIN_VAN, TIN_BAI, TIN_SU_KIEN.
-- Ed25519 signed operator approval: bind case, item fingerprint (including title, metadata and PDF hash), action, CMS module, HTTPS target origin and expiry (max 8 hours); executor holds only trusted PUBLIC verification key. The private signing key remains with the independent authorizer.
+- Ed25519 signed operator approval: bind case, item fingerprint (including title, metadata and PDF hash), action, CMS module, HTTPS target origin and expiry (max 8 hours); executor holds only trusted PUBLIC verification key. Approval is rechecked immediately before publication, including revocation of live acknowledgment. The private signing key remains with the independent authorizer.
 - TIN_VAN / articles: publish only with an additional exact-item permission; otherwise SAVE_DRAFT.
 - CMS adapter contract: remote duplicate lookup before CREATE; compare fingerprint and downloaded attachment SHA; verify DRAFT before proceeding; verify PUBLISHED after step 1.
 - HOLD for missing scope/conflicting record, NEEDS_RECONCILE for uncertain write outcome (never blindly retry).

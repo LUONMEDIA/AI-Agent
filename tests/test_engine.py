@@ -530,6 +530,19 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(result["reason"], "SOURCE_DISAPPEARED_AFTER_APPROVAL")
         self.assertFalse(cms.called)
 
+    def test_operator_revokes_after_create_prevents_approval(self):
+        class RevokingCMS(MockCMS):
+            def create_draft(self, item):
+                record_id = super().create_draft(item)
+                os.environ["CMS_AGENT_ENABLE_LIVE"] = "NO"
+                return record_id
+        cms = RevokingCMS()
+        result = self.run_item(cms)
+        self.assertEqual(result["status"], "HOLD")
+        self.assertEqual(result["reason"], "LIVE_EXECUTION_NOT_ACKNOWLEDGED")
+        self.assertEqual(cms.created, 1)
+        self.assertEqual(cms.published, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
