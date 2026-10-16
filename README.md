@@ -12,7 +12,7 @@ Framework for preparing and verifying document uploads to a CMS. Designed for Co
 - HOLD for missing scope/conflicting record, NEEDS_RECONCILE for uncertain write outcome (never blindly retry).
 - Mock CMS + unit tests; GitHub Actions offline-only; dry-run CLI does not instantiate a CMS adapter.
 - LIVE runner adds private append+fsync audit events before/after each item and stops the batch immediately after uncertain remote writes; local audit directory must be owner-only (0700).
-- Optional Playwright BrowserCMS adapter with private verified selector profile and auth snapshot. **Untested against target CMS; use only after staging validation.**
+- Optional Playwright BrowserCMS adapter with private verified STAGING-only selector profile and auth snapshot. **Untested against target CMS; use only after staging validation.**
 
 ## Architecture
 
@@ -58,7 +58,7 @@ This command is read-only and makes no CMS requests. A file check can fail close
     export CMS_AGENT_AUDIT_PATH=/secure/private-audit/events.jsonl
     cms-batch private/batch.json --live --approval-file /secure/approved-case.json --adapter cms_agent.browser.BrowserCMS
 
-The browser workflow assumes a CMS supports a searchable document number, verified search-complete marker, persistent fingerprint field, downloadable PDF, verified intermediate Forward status and separate Forward and Approve controls. If any are missing, the adapter **must not be used** until adapted and reviewed for that particular CMS.
+The browser workflow assumes a CMS supports a searchable document number, exact numeric total count matching search rows and a verified pagination control, visible title/metadata readback, a persistent fingerprint field, downloadable original PDF, verified intermediate Forward status and separate Forward and Approve controls. The provided BrowserCMS adapter is STAGING-ONLY and fails closed for production profiles pending a separate approved release. If any are missing, the adapter **must not be used** until adapted and reviewed for that particular CMS.
 
 One profile represents ONE verified CMS module. Split mixed-product batches by module before execution. There is no production API URL/endpoint, selector map, or credential in this repository.
 

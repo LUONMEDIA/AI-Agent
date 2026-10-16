@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import urljoin, urlparse
 import json
 import os
+import stat
 
 from .engine import Hold, Item, RemoteRecord
 
@@ -28,19 +29,30 @@ class BrowserCMS:
         profile_file, auth_file = Path(profile_path), Path(state_path)
         if not profile_file.is_file() or not auth_file.is_file():
             raise Hold("PROFILE_OR_AUTH_STATE_MISSING")
+        for path in (profile_file, auth_file):
+            if path.is_symlink() or stat.S_IMODE(path.stat().st_mode) & 0o077:
+                raise Hold("PRIVATE_PROFILE_OR_AUTH_PERMISSIONS_TOO_OPEN")
         self.config = json.loads(profile_file.read_text(encoding="utf-8"))
         self.origin = self._url_config("origin").rstrip("/")
+        if self._text_config("deployment_stage") != "STAGING":
+            raise Hold("ONLY_VERIFIED_STAGING_PROFILES_ALLOWED")
         self.module = self._text_config("module")
         self.selectors = self.config.get("selectors")
         if not isinstance(self.selectors, dict):
             raise Hold("SELECTORS_NOT_CONFIGURED")
-        for key in ("module_marker", "search_input", "search_submit", "search_done_marker", "search_rows",
+        for key in ("module_marker", "search_input", "search_submit", "search_done_marker", "search_total", "search_rows", "pagination_next",
                     "row_number", "row_detail_link", "number_detail",
-                    "module_detail", "fingerprint_detail", "status_detail",
+                    "module_detail", "title_detail", "fingerprint_detail", "status_detail",
                     "attachment_link", "form_number", "form_title",
                     "form_fingerprint", "form_pdf", "save_button",
                     "forward_button", "approve_button"):
             self._selector(key)
+        metadata_selectors = self.config.get("metadata_detail_fields")
+        if not isinstance(metadata_selectors, dict) or not metadata_selectors:
+            raise Hold("METADATA_READBACK_MAPPING_REQUIRED")
+        for field, selector in metadata_selectors.items():
+            if not isinstance(field, str) or not isinstance(selector, str) or not selector.strip():
+                raise Hold("INVALID_METADATA_READBACK_MAPPING")
         self._pw = sync_playwright().start()
         self._browser = None
         try:
@@ -116,12 +128,13 @@ class BrowserCMS:
         self.page.locator(self._selector("search_submit")).click()
         self.page.locator(self._selector("search_done_marker")).wait_for(state="visible", timeout=15000)
         self._assert_module()
-        next_page = self.selectors.get("pagination_next")
-        if next_page:
-            next_locator = self.page.locator(next_page)
-            if next_locator.count() and next_locator.is_visible() and next_locator.is_enabled():
-                raise Hold("PAGINATED_RESULTS_NOT_EXHAUSTED")
+        next_locator = self.page.locator(self._selector("pagination_next"))
+        if next_locator.count() and next_locator.is_visible() and next_locator.is_enabled():
+            raise Hold("PAGINATED_RESULTS_NOT_EXHAUSTED")
         rows = self.page.locator(self._selector("search_rows"))
+        total_raw = self._text("search_total")
+        if not total_raw.isdecimal() or int(total_raw) != rows.count():
+            raise Hold("SEARCH_TOTAL_NOT_PROVEN")
         if rows.count() > 100:
             raise Hold("SEARCH_RESULT_LIMIT_EXCEEDED")
         matches = []
@@ -143,6 +156,16 @@ class BrowserCMS:
         self._goto(record_id)
         number = self._text("number_detail")
         module = self._text("module_detail")
+        title = self._text("title_detail")
+        metadata = {}
+        for field, selector in self.config["metadata_detail_fields"].items():
+            locator = self.page.locator(selector)
+            if locator.count() != 1:
+                raise Hold("METADATA_READBACK_SELECTOR_NOT_UNIQUE")
+            try:
+                metadata[field] = locator.input_value().strip()
+            except Exception:
+                metadata[field] = locator.inner_text().strip()
         if module != self.module:
             raise Hold("REMOTE_MODULE_MISMATCH")
         fingerprint = self._text("fingerprint_detail")
@@ -169,7 +192,7 @@ class BrowserCMS:
         if not body.startswith(b"%PDF-") or len(body) > max_bytes:
             raise Hold("ATTACHMENT_INVALID_OR_TOO_LARGE")
         return RemoteRecord(record_id, number, module, fingerprint,
-                            sha256(body).hexdigest(), status)
+                            sha256(body).hexdigest(), status, title, metadata)
 
     def create_draft(self, item: Item) -> str:
         if item.target_module != self.module:
@@ -179,7 +202,7 @@ class BrowserCMS:
         self.page.locator(self._selector("form_title")).fill(item.title)
         self.page.locator(self._selector("form_fingerprint")).fill(item.fingerprint)
         selectors_for_fields = self.config.get("metadata_fields", {})
-        if not isinstance(selectors_for_fields, dict):
+        if not isinstance(selectors_for_fields, dict) or set(selectors_for_fields) != set(self.config["metadata_detail_fields"]):
             raise Hold("METADATA_SELECTORS_INVALID")
         for key, value in item.fields.items():
             locator = selectors_for_fields.get(key)

@@ -8,7 +8,8 @@ STATUS: NOT_VERIFIED / NO_PRODUCTION_ACCESS. No real CMS URLs, credentials, sele
 | Official/API endpoint and API permission | documented spec or authenticated supported read-only probe | UNKNOWN |
 | CMS module for CSDL vs Tin vắn/Tin bài | operator-approved URL, title and known stable selector | UNKNOWN |
 | Auth mechanism incl. SSO/MFA/session rotation | site admin + operator-approved integration method | UNKNOWN |
-| Duplicate search completeness | search exact doc number, pagination and count evidence | UNKNOWN |
+| Duplicate search completeness | search exact doc number, pagination and integer count evidence | UNKNOWN |
+| Displayed trích yếu and metadata readback | exact title + all signed form fields from remote CMS, not just a fingerprint field | UNKNOWN |
 | Create/save draft workflow | staging screenshot/trace and readback | UNKNOWN |
 | Upload PDF original bytes | permitted downloadable original and SHA-256 proof | UNKNOWN |
 | Fingerprint field or idempotency key | persistent field/API support verified | UNKNOWN |

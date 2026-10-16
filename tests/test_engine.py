@@ -182,8 +182,9 @@ class EngineTests(unittest.TestCase):
             def readback(self, record_id):
                 r = super().readback(record_id)
                 return RemoteRecord(r.record_id, r.number, r.module, r.fingerprint, "x" * 64, r.status, r.title, r.fields)
-        self.assertEqual(self.run_item(WrongFileCMS())["reason"],
-                         "REMOTE_CONTENT_OR_ATTACHMENT_MISMATCH")
+        result = self.run_item(WrongFileCMS())
+        self.assertEqual(result["status"], "NEEDS_RECONCILE")
+        self.assertEqual(result["reason"], "POST_CREATE_READBACK_UNVERIFIED")
 
     def test_expired_approval_holds(self):
         permit = dict(self.permit, expires_at="2020-01-01T00:00:00Z")
@@ -414,8 +415,9 @@ class EngineTests(unittest.TestCase):
         many = Batch(batch.case_id, (batch.items[0], other))
         class WrongRecord(MockCMS):
             def find(self, item):
-                return [RemoteRecord("bad", item.document_number, item.target_module,
-                                     "incorrect", item.source_sha256, "DRAFT", item.title, item.fields)]
+                self.records["bad"] = RemoteRecord("bad", item.document_number, item.target_module,
+                                                    "incorrect", item.source_sha256, "DRAFT", item.title, item.fields)
+                return [self.records["bad"]]
         cms = WrongRecord()
         events = []
         with self.live:
