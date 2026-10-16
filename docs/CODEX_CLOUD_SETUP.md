@@ -20,5 +20,6 @@ Chat validates/source-locks product cases and prepares private manifests. Cloud 
 4. Save draft then readback signed attachment bytes; transition/approval separately verified.
 5. Remote PDF SHA matches uploaded PDF, or documented server transforms with safe alternative proof.
 6. Trusted external Ed25519 approval signer and public verification key managed independently of executor.
-7. Private audit directory 0700, files 0600, incident and rollback plan.
+7. Private audit directory 0700, files 0600, process-wide exclusive run lock, incident and rollback plan.
+7a. CMS-side idempotency or distributed lock across Cloud workers before production; per-host fcntl lock alone is NOT enough.
 8. Operator's exact BƯỚC 1 approval, STOP_POINT and State write/readback. No automatic BƯỚC 2 QLVB.

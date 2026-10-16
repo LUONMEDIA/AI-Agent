@@ -444,6 +444,31 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(result["reason"], "PRE_PUBLISH_READBACK_UNVERIFIED")
         self.assertEqual(cms.published, 0)
 
+    def test_exclusive_lock_prevents_parallel_worker_on_same_host(self):
+        from cms_agent.runner import ExclusiveRunLock
+        from cms_agent.engine import Hold
+        folder = self.root / "secure-lock"
+        folder.mkdir(mode=0o700)
+        lock_file = folder / "cms-agent.lock"
+        with ExclusiveRunLock(lock_file):
+            with self.assertRaisesRegex(Hold, "CMS_WORKER_ALREADY_RUNNING_ON_HOST"):
+                ExclusiveRunLock(lock_file)
+        with ExclusiveRunLock(lock_file):
+            pass
+
+    def test_exclusive_lock_blocks_symlink(self):
+        from cms_agent.runner import ExclusiveRunLock
+        from cms_agent.engine import Hold
+        folder = self.root / "secure-lock"
+        folder.mkdir(mode=0o700)
+        target = folder / "real.lock"
+        target.write_text("")
+        target.chmod(0o600)
+        link = folder / "link.lock"
+        link.symlink_to(target)
+        with self.assertRaisesRegex(Hold, "LOCK_SYMLINK_FORBIDDEN"):
+            ExclusiveRunLock(link)
+
 
 if __name__ == "__main__":
     unittest.main()

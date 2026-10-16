@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 from .engine import load_batch, dry_run, Hold, check_permission
-from .runner import PrivateAudit, run_batch
+from .runner import PrivateAudit, ExclusiveRunLock, run_batch
 
 
 APPROVED_LIVE_ADAPTERS = frozenset({"cms_agent.browser.BrowserCMS"})
@@ -44,12 +44,13 @@ def main(argv: list[str] | None = None) -> int:
             check_permission(batch, item, approval, approval.get("target_origin"))
         module_name, _, class_name = args.adapter.rpartition(".")
         adapter_type = getattr(importlib.import_module(module_name), class_name)
-        adapter = adapter_type()
-        try:
-            results = run_batch(batch, approval, adapter, audit)
-        finally:
-            if hasattr(adapter, "close"):
-                adapter.close()
+        with ExclusiveRunLock(audit.path.parent / "cms-agent.lock"):
+            adapter = adapter_type()
+            try:
+                results = run_batch(batch, approval, adapter, audit)
+            finally:
+                if hasattr(adapter, "close"):
+                    adapter.close()
         print(json.dumps({"case_id": batch.case_id, "results": results},
                          ensure_ascii=False, indent=2))
         return 2 if len(results) < len(batch.items) or any(
