@@ -469,6 +469,67 @@ class EngineTests(unittest.TestCase):
         with self.assertRaisesRegex(Hold, "LOCK_SYMLINK_FORBIDDEN"):
             ExclusiveRunLock(link)
 
+    def test_end_to_end_two_items_different_products_audited_and_idempotent(self):
+        from cms_agent.runner import run_batch, PrivateAudit
+        from cms_agent.engine import Batch
+        base = self.load()
+        first = base.items[0]
+        second = dataclasses.replace(
+            first, item_id="synthetic-2", document_number="TEST-002",
+            product_class="TIN_VAN", action="SAVE_DRAFT")
+        batch = Batch(base.case_id, (first, second))
+        permit = dict(
+            self.permit,
+            item_actions={first.item_id: first.action, second.item_id: second.action},
+            item_fingerprints={first.item_id: first.fingerprint, second.item_id: second.fingerprint},
+        )
+        signed = self.seal(permit, base)
+        secure = self.root / "audit"
+        secure.mkdir(mode=0o700)
+        sink = PrivateAudit(secure / "events.jsonl")
+        cms = MockCMS()
+        with self.live:
+            first_pass = run_batch(batch, signed, cms, sink)
+            second_pass = run_batch(batch, signed, cms, sink)
+        self.assertEqual([r["status"] for r in first_pass],
+                         ["PUBLISHED_STEP1_VERIFIED", "DRAFT_VERIFIED"])
+        self.assertEqual([r["status"] for r in second_pass],
+                         ["ALREADY_PUBLISHED", "ALREADY_DRAFT"])
+        self.assertEqual(cms.created, 2)
+        self.assertEqual(cms.published, 1)
+        events = (secure / "events.jsonl").read_text().splitlines()
+        self.assertEqual(len(events), 8)
+        self.assertEqual([json.loads(e)["stage"] for e in events],
+                         ["BEFORE_REMOTE", "AFTER_REMOTE"] * 4)
+
+    def test_draft_remote_metadata_changed_blocks_reuse(self):
+        cms = MockCMS()
+        batch = self.load()
+        item = batch.items[0]
+        record_id = cms.create_draft(item)
+        cms.records[record_id] = dataclasses.replace(
+            cms.records[record_id], fields={"category": "unapproved"})
+        result = self.run_item(cms)
+        self.assertEqual(result["status"], "HOLD")
+        self.assertEqual(result["reason"], "REMOTE_CONTENT_OR_ATTACHMENT_MISMATCH")
+        self.assertEqual(cms.published, 0)
+
+    def test_running_after_pdf_disappears_is_blocked_without_remote_query(self):
+        batch = self.load()
+        permit = self.seal(self.permit)
+        self.pdf.unlink()
+        class SearchSpy(MockCMS):
+            called = False
+            def find(self, item):
+                self.called = True
+                return []
+        cms = SearchSpy()
+        with self.live:
+            result = execute_item(batch, batch.items[0], permit, cms)
+        self.assertEqual(result["status"], "HOLD")
+        self.assertEqual(result["reason"], "SOURCE_DISAPPEARED_AFTER_APPROVAL")
+        self.assertFalse(cms.called)
+
 
 if __name__ == "__main__":
     unittest.main()
