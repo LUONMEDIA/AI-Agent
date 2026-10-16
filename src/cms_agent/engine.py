@@ -60,6 +60,8 @@ class RemoteRecord:
     fingerprint: str
     attachment_sha256: str
     status: str  # DRAFT | PUBLISHED; unknown statuses must block
+    title: str | None = None
+    fields: dict[str, str] | None = None
 
 
 class CMSAdapter(Protocol):
@@ -111,6 +113,7 @@ def load_batch(manifest_path: str | Path) -> Batch:
     if not isinstance(rows, list) or not rows:
         raise Hold("EMPTY_OR_INVALID_BATCH")
     seen = set()
+    seen_document_numbers = set()
     items = []
     for row in rows:
         if not isinstance(row, dict):
@@ -119,6 +122,10 @@ def load_batch(manifest_path: str | Path) -> Batch:
         if item_id in seen:
             raise Hold("DUPLICATE_ITEM_ID")
         seen.add(item_id)
+        doc_key = (_required_str(row, "target_module"), _required_str(row, "document_number"))
+        if doc_key in seen_document_numbers:
+            raise Hold("DUPLICATE_DOCUMENT_NUMBER_IN_MODULE")
+        seen_document_numbers.add(doc_key)
         product = _required_str(row, "product_class")
         action = _required_str(row, "action")
         if product not in PRODUCTS or action not in ACTIONS:
@@ -166,11 +173,24 @@ def check_permission(batch: Batch, item: Item, permit: dict[str, Any], target_or
     # Never treat this as permission for public QA or QLVB Step 2.
 
 
+def _verify_local_source(item: Item) -> None:
+    """Detect PDF changes after planning or approval, before CMS side effects."""
+    try:
+        with item.source_path.open("rb") as source:
+            content = source.read()
+    except OSError as error:
+        raise Hold("SOURCE_DISAPPEARED_AFTER_APPROVAL") from error
+    if not content.startswith(b"%PDF-") or sha256(content).hexdigest() != item.source_sha256:
+        raise Hold("SOURCE_CHANGED_AFTER_APPROVAL")
+
+
 def _assert_readback(item: Item, record: RemoteRecord, status: str) -> None:
     if (record.number != item.document_number
             or record.module != item.target_module
             or record.fingerprint != item.fingerprint
-            or record.attachment_sha256 != item.source_sha256):
+            or record.attachment_sha256 != item.source_sha256
+            or record.title != item.title
+            or record.fields != item.fields):
         raise Hold("REMOTE_CONTENT_OR_ATTACHMENT_MISMATCH")
     if record.status != status:
         raise Hold("REMOTE_STATUS_NOT_CONFIRMED")
@@ -180,6 +200,7 @@ def execute_item(batch: Batch, item: Item, permit: dict[str, Any], adapter: CMSA
     base = {"item_id": item.item_id, "action": item.action}
     try:
         check_permission(batch, item, permit, getattr(adapter, 'origin', None))
+        _verify_local_source(item)
         matches = adapter.find(item)
         if len(matches) > 1:
             raise Hold("MULTIPLE_REMOTE_MATCHES")
@@ -197,19 +218,31 @@ def execute_item(batch: Batch, item: Item, permit: dict[str, Any], adapter: CMSA
                 return {**base, "status": "ALREADY_DRAFT", "record_id": record.record_id}
             record_id = record.record_id
         else:
+            _verify_local_source(item)
             try:
                 record_id = adapter.create_draft(item)
             except Exception:
                 return {**base, "status": "NEEDS_RECONCILE", "reason": "CREATE_OUTCOME_UNKNOWN"}
-            _assert_readback(item, adapter.readback(record_id), "DRAFT")
+            try:
+                _assert_readback(item, adapter.readback(record_id), "DRAFT")
+            except Exception:
+                return {**base, "status": "NEEDS_RECONCILE", "reason": "POST_CREATE_READBACK_UNVERIFIED"}
             if item.action == "SAVE_DRAFT":
                 return {**base, "status": "DRAFT_VERIFIED", "record_id": record_id}
-        # Publication authority is exact-scope, and all content must already be verified.
+        # Revalidate signed source before APPROVE, including resumed drafts.
+        _verify_local_source(item)
+        try:
+            _assert_readback(item, adapter.readback(record_id), "DRAFT")
+        except Exception:
+            return {**base, "status": "NEEDS_RECONCILE", "reason": "PRE_PUBLISH_READBACK_UNVERIFIED"}
         try:
             adapter.publish_step1(record_id)
         except Exception:
             return {**base, "status": "NEEDS_RECONCILE", "reason": "PUBLISH_OUTCOME_UNKNOWN"}
-        _assert_readback(item, adapter.readback(record_id), "PUBLISHED")
+        try:
+            _assert_readback(item, adapter.readback(record_id), "PUBLISHED")
+        except Exception:
+            return {**base, "status": "NEEDS_RECONCILE", "reason": "POST_PUBLISH_READBACK_UNVERIFIED"}
         return {**base, "status": "PUBLISHED_STEP1_VERIFIED", "record_id": record_id}
     except Hold as exc:
         return {**base, "status": "HOLD", "reason": str(exc)}

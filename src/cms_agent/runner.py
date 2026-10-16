@@ -78,10 +78,8 @@ def run_batch(
         result = execute_item(batch, item, approval, adapter)
         audit(batch.case_id, item.item_id, "AFTER_REMOTE", result["status"], result.get("reason", ""))
         results.append(result)
-        if result["status"] == "NEEDS_RECONCILE":
+        # STOP on EVERY failure. A Hold can occur after a remote side effect;
+        # never advance the batch until a human reconciles current CMS state.
+        if result["status"] in {"HOLD", "NEEDS_RECONCILE"}:
             break
-        if result["status"] == "HOLD":
-            reason = result.get("reason", "")
-            if reason in SYSTEMIC_HOLDS or reason.startswith("APPROVAL_"):
-                break
     return results

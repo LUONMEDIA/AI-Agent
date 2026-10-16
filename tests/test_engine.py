@@ -181,7 +181,7 @@ class EngineTests(unittest.TestCase):
         class WrongFileCMS(MockCMS):
             def readback(self, record_id):
                 r = super().readback(record_id)
-                return RemoteRecord(r.record_id, r.number, r.module, r.fingerprint, "x" * 64, r.status)
+                return RemoteRecord(r.record_id, r.number, r.module, r.fingerprint, "x" * 64, r.status, r.title, r.fields)
         self.assertEqual(self.run_item(WrongFileCMS())["reason"],
                          "REMOTE_CONTENT_OR_ATTACHMENT_MISMATCH")
 
@@ -355,6 +355,92 @@ class EngineTests(unittest.TestCase):
         link.symlink_to(target)
         with self.assertRaisesRegex(Hold, "AUDIT_SYMLINK_FORBIDDEN"):
             PrivateAudit(link)
+
+    def test_duplicate_number_same_module_blocks(self):
+        row = dict(self.template["items"][0])
+        row["item_id"] = "synthetic-2"
+        self.template["items"].append(row)
+        self.write()
+        with self.assertRaisesRegex(Hold, "DUPLICATE_DOCUMENT_NUMBER_IN_MODULE"):
+            self.load()
+
+    def test_source_changes_after_approval_block(self):
+        batch = self.load()
+        permit = self.seal(self.permit, batch)
+        self.pdf.write_bytes(self.pdf.read_bytes() + b"\nchanged after load")
+        cms = MockCMS()
+        with self.live:
+            result = execute_item(batch, batch.items[0], permit, cms)
+        self.assertEqual(result["reason"], "SOURCE_CHANGED_AFTER_APPROVAL")
+        self.assertEqual(cms.created, 0)
+
+    def test_readback_title_diff_blocks_after_create(self):
+        class WrongTitle(MockCMS):
+            def readback(self, record_id):
+                r = super().readback(record_id)
+                return dataclasses.replace(r, title="Wrong displayed title")
+        result = self.run_item(WrongTitle())
+        self.assertEqual(result["status"], "NEEDS_RECONCILE")
+        self.assertEqual(result["reason"], "POST_CREATE_READBACK_UNVERIFIED")
+
+    def test_readback_metadata_diff_blocks_after_create(self):
+        class WrongMeta(MockCMS):
+            def readback(self, record_id):
+                r = super().readback(record_id)
+                return dataclasses.replace(r, fields={"category": "WRONG"})
+        result = self.run_item(WrongMeta())
+        self.assertEqual(result["status"], "NEEDS_RECONCILE")
+        self.assertEqual(result["reason"], "POST_CREATE_READBACK_UNVERIFIED")
+
+    def test_readback_after_publish_fails_reconcile(self):
+        class LostResult(MockCMS):
+            def readback(self, record_id):
+                r = super().readback(record_id)
+                if r.status == "PUBLISHED":
+                    raise OSError("unknown after approval")
+                return r
+        cms = LostResult()
+        result = self.run_item(cms)
+        self.assertEqual(result["status"], "NEEDS_RECONCILE")
+        self.assertEqual(result["reason"], "POST_PUBLISH_READBACK_UNVERIFIED")
+        self.assertEqual(cms.published, 1)
+
+    def test_batch_stops_on_any_hold_including_item_specific(self):
+        from cms_agent.runner import run_batch
+        from cms_agent.engine import Batch
+        batch = self.load()
+        other = dataclasses.replace(
+            batch.items[0], item_id="synthetic-2", document_number="TEST-002")
+        many = Batch(batch.case_id, (batch.items[0], other))
+        class WrongRecord(MockCMS):
+            def find(self, item):
+                return [RemoteRecord("bad", item.document_number, item.target_module,
+                                     "incorrect", item.source_sha256, "DRAFT", item.title, item.fields)]
+        cms = WrongRecord()
+        events = []
+        with self.live:
+            result = run_batch(many, self.seal(self.permit, batch), cms,
+                               lambda *args: events.append(args))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["status"], "HOLD")
+        self.assertEqual([x[2] for x in events], ["BEFORE_REMOTE", "AFTER_REMOTE"])
+
+    def test_corrupted_draft_before_publish_reconciles(self):
+        class MutatedDraft(MockCMS):
+            def __init__(self):
+                super().__init__()
+                self.read_count = 0
+            def readback(self, record_id):
+                self.read_count += 1
+                r = super().readback(record_id)
+                if self.read_count >= 2:
+                    return dataclasses.replace(r, title="Changed by another actor")
+                return r
+        cms = MutatedDraft()
+        result = self.run_item(cms)
+        self.assertEqual(result["status"], "NEEDS_RECONCILE")
+        self.assertEqual(result["reason"], "PRE_PUBLISH_READBACK_UNVERIFIED")
+        self.assertEqual(cms.published, 0)
 
 
 if __name__ == "__main__":

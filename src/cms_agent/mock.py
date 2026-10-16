@@ -22,7 +22,7 @@ class MockCMS:
         record_id = f"fake-{self.created}"
         self.records[record_id] = RemoteRecord(
             record_id, item.document_number, item.target_module,
-            item.fingerprint, item.source_sha256, "DRAFT")
+            item.fingerprint, item.source_sha256, "DRAFT", item.title, dict(item.fields))
         return record_id
 
     def readback(self, record_id: str) -> RemoteRecord:
@@ -35,4 +35,4 @@ class MockCMS:
         self.published += 1
         self.records[record_id] = RemoteRecord(
             record.record_id, record.number, record.module, record.fingerprint,
-            record.attachment_sha256, "PUBLISHED")
+            record.attachment_sha256, "PUBLISHED", record.title, record.fields)
