@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lượn Photo Batch — chỉnh ảnh hàng loạt, xử lý ngay trên máy</title>
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<header>
+  <h1>Lượn Photo Batch</h1>
+  <p class="sub">Chỉnh cả buổi chụp trong một lần. Ảnh không rời khỏi máy bạn.</p>
+</header>
+<main>
+  <section id="drop" tabindex="0" aria-label="Thả ảnh vào đây">
+    <p><strong>Thả ảnh vào đây</strong> hoặc <label class="link">chọn ảnh<input id="file" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden></label></p>
+    <p class="hint">JPG, PNG, WebP. RAW/HEIC: hãy xuất sang JPG trước.</p>
+  </section>
+
+  <div id="workspace" hidden>
+    <aside id="panel">
+      <h2>Cài đặt <span id="target-label"></span></h2>
+      <label>Phong cách
+        <select id="preset"></select>
+      </label>
+      <div id="sliders"></div>
+      <div class="row">
+        <button id="apply-sel">Áp dụng cho ảnh đã chọn</button>
+        <button id="apply-all">Áp dụng cho tất cả</button>
+      </div>
+      <div class="row">
+        <button id="match-exp" title="Cân độ sáng các ảnh đã chọn theo ảnh đang xem">Cân sáng theo ảnh này</button>
+        <button id="reset">Đặt lại ảnh này</button>
+      </div>
+      <hr>
+      <h2>Lọc ảnh</h2>
+      <div class="row">
+        <button id="select-ok">Chọn ảnh tốt</button>
+        <button id="remove-bad">Bỏ ảnh mờ/cháy/tối</button>
+      </div>
+      <hr>
+      <h2>Xuất</h2>
+      <label>Chất lượng JPG <output id="q-out">92</output>
+        <input id="quality" type="range" min="60" max="100" value="92">
+      </label>
+      <label>Cạnh dài tối đa (px, 0 = giữ nguyên)
+        <input id="maxside" type="number" min="0" step="100" value="0">
+      </label>
+      <button id="export" class="primary">Xuất ZIP</button>
+      <progress id="progress" max="1" value="0" hidden></progress>
+      <p id="status" role="status"></p>
+    </aside>
+    <section id="stage">
+      <div id="viewer"><canvas id="main"></canvas><div id="compare-hint">Giữ chuột để xem ảnh gốc</div></div>
+      <div id="grid"></div>
+    </section>
+  </div>
+</main>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
