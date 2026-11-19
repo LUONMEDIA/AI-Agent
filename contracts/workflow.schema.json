@@ -26,6 +26,6 @@
           "idempotency_key": { "type": "string", "minLength": 1 }
         }
       }
-    },
+    }
   }
 }
