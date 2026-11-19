@@ -9,7 +9,7 @@ class ContractFileTests(unittest.TestCase):
     def test_all_contracts_are_valid_json_and_have_draft(self):
         root = Path(__file__).resolve().parents[2]
         contract_files = sorted((root / "contracts").glob("*.schema.json"))
-        self.assertGreaterEqual(len(contract_files), 5)
+        self.assertGreaterEqual(len(contract_files), 6)
         for path in contract_files:
             with self.subTest(contract=path.name):
                 schema = json.loads(path.read_text(encoding="utf-8"))

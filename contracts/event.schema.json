@@ -1,14 +1,28 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luonmedia.com/ai-agent/contracts/event.schema.json",
-  "title": "LUON Task Lifecycle Event",
+  "title": "LUON Task and Workflow Lifecycle Event",
+  "description": "Normalized event envelope. Event-chain hashes are stored by the private state store.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["event_id", "task_id", "event_type", "actor", "occurred_at"],
+  "required": ["event_id", "event_type", "actor", "occurred_at"],
   "properties": {
     "event_id": { "type": "string", "minLength": 1 },
-    "task_id": { "type": "string", "minLength": 1 },
-    "event_type": { "type": "string", "enum": ["task.accepted", "task.routed", "task.started", "task.blocked", "task.completed", "task.failed", "approval.requested", "approval.granted", "approval.revoked", "artifact.created", "artifact.verified", "reconciliation.required"] },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": ["string", "null"] },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "workflow.created", "workflow.status_changed",
+        "task.created", "task.ready", "task.claimed", "task.started",
+        "task.succeeded", "task.blocked", "task.failed",
+        "task.needs_reconciliation", "task.cancelled",
+        "task.reconciliation_resolved", "task.unblocked",
+        "task.accepted", "task.routed", "task.completed",
+        "approval.requested", "approval.granted", "approval.revoked",
+        "artifact.created", "artifact.verified", "reconciliation.required"
+      ]
+    },
     "actor": { "type": "string", "minLength": 1 },
     "occurred_at": { "type": "string", "format": "date-time" },
     "status": { "type": "string" },
