@@ -1,6 +1,6 @@
 # LUON AI-Agent Platform — Architecture V2
 
-**Status:** Foundation implementation / candidate architecture  
+**Status:** Foundation plus local orchestration implementation / candidate architecture  
 **Date:** 2026-11-19  
 **Target repository:** `LUONMEDIA/AI-Agent`  
 **Release posture:** no merge, deployment, production connection, or production mutation authorized by this work.
@@ -22,13 +22,14 @@ Provider-specific SDKs and credentials belong in separately managed adapters/env
 ### B. Shared core
 
 Responsibilities:
-- Validate the shared task envelope.
+- Validate versioned workflow and task envelopes.
 - Resolve a specialist from an explicit agent ID or a unique capability match.
-- Enforce lifecycle and policy gates before dispatch.
+- Persist local workflow/task state and dependency relationships.
+- Claim work through short-lived local leases and enforce task lifecycle transitions.
 - Correlate task, artifact, approval, and audit references.
-- Provide consistent error states and stop conditions.
+- Detect event-history tampering and expose explicit reconciliation states.
 
-The first foundation implementation provides registry validation and deterministic capability routing only. Persistent state, distributed locks, provider invocation, authorization services, and dispatch workers are not implemented by this PR.
+The current implementation includes registry validation, deterministic routing, a local SQLite state store, dependency scheduling, local task leases, and a hash-chained event history. It does not include distributed coordination, provider invocation, centralized authorization, or remote dispatch workers.
 
 ### C. Specialist agents and applications
 
@@ -43,30 +44,38 @@ Adapters translate a specialist's approved contract into a concrete system integ
 
 A connector is not a permission grant. Credentials and session state stay outside this public repository.
 
-## 3. Routing policy
+## 3. Routing and orchestration policy
 
-1. Every task declares `task_id` and `required_capability`.
-2. A caller may set `target_agent` when it knows the exact specialist.
-3. Without an explicit target, the router may select only one enabled, active registration advertising the required capability.
-4. Zero matches, disabled candidates, and multiple matches are hard errors. The router never guesses.
-5. Routing does not authorize an action. The specialist performs its own permission, approval, target, and source checks.
-6. The AI runtime/provider is selected by the execution environment, not by the domain capability router.
+1. Every workflow has a stable workflow ID and one or more task IDs.
+2. Every task declares a task type and required capability; optional dependencies form a directed acyclic graph.
+3. A caller may set a target agent when it knows the exact specialist.
+4. Without an explicit target, the router may select only one enabled, active registration advertising the required capability.
+5. Zero matches, disabled candidates, and multiple matches are hard errors. The router never guesses.
+6. A claim records a local worker lease and assigned agent; it does not call that agent.
+7. Only successful completion releases dependent tasks. Failed, blocked, or unknown-outcome tasks do not release downstream work.
+8. Expired leases move to NEEDS_RECONCILIATION. There is no automatic retry after a worker disappears.
+9. Routing and leasing do not authorize a specialist action. The specialist must perform its own permission, approval, target, source, and readback checks.
+10. The AI runtime/provider is selected by the execution environment, not by the domain capability router.
 
 ## 4. Shared contracts
 
 Contracts are versioned JSON Schema files:
+- Workflow: task graph and dependency envelope.
 - Task: request envelope and routing intent.
 - Agent: registration, capability, lifecycle, and execution boundary.
 - Artifact: URI, SHA-256, provenance, and sensitivity.
 - Approval: issuer, exact subject/actions/scope, validity window, revocation reference, signature.
-- Event: normalized lifecycle and audit event.
+- Event: normalized workflow/task lifecycle and audit event.
 
 Specialist-specific payloads remain owned by their specialist. Do not force CMS metadata and photo-editing settings into one generic schema.
 
-## 5. Security and trust boundaries
+## 5. State, audit, and trust boundaries
 
-- Public GitHub stores source, schemas, synthetic fixtures, and non-sensitive docs only.
-- Secrets, auth states, private source files, signed approval payloads, production manifests, and operational audit logs stay in private execution environments.
+- The SQLite store is a private local development/runtime component and must live outside the public repository.
+- SQLite WAL and BEGIN IMMEDIATE serialize local writes; this does not establish cross-host locking or safe network-filesystem semantics.
+- The event chain is tamper-evident against changes detectable from the stored chain. It is not immutable against an attacker who can rewrite the database and recompute the chain; production audit requires an independently protected signed checkpoint or external append-only sink.
+- Lease expiry never requeues a task. The task is moved to NEEDS_RECONCILIATION and requires evidence plus an explicit resolution.
+- Secrets, auth states, private source files, signed approval payloads, production manifests, database files, and operational audit logs stay in private execution environments.
 - A signature establishes integrity and signer identity only when the verifier trusts the key. It does not replace target-system account permissions or operator approval.
 - Staging and production are separate targets. A staging test cannot be represented as production acceptance.
 - Unknown remote write outcome, failed readback, duplicate ambiguity, expired/revoked approval, or target mismatch => stop and reconcile. No blind retry.
@@ -101,21 +110,27 @@ This foundation deliberately does not merge, rebase, or rewrite those PRs. Their
 
 ## 8. Deliberately not implemented yet
 
-- Provider-specific ChatGPT/Claude/Codex adapters.
-- Persistent task database, durable queue, retries, or distributed scheduler.
-- Central identity, policy decision point, signing service, or key lifecycle.
-- Cross-host idempotency/distributed locking.
+- Provider-specific ChatGPT/Claude/Codex adapters and actual remote dispatch.
+- Shared multi-host database/queue, distributed locks, or distributed scheduler.
+- Central identity, policy decision point, approval-signature verification service, or key lifecycle.
+- External append-only audit sink and independently signed audit checkpoints.
 - Google Drive/CMS/QLVB/Meta/Canva connectors.
 - Production executor or deployment pipeline.
 - Full end-to-end integration tests against real external systems.
 
 These require explicit technical choices, external credentials/permissions, and independently observed acceptance evidence. The foundation must not simulate them and call them complete.
 
-## 9. Acceptance criteria for this foundation
+## 9. Acceptance criteria for this increment
 
 - Shared contracts are versioned and parse as JSON.
 - Registry rejects malformed entries, duplicate IDs, and enabled non-active agents.
 - Router routes only a unique active capability match and fails closed otherwise.
-- CMS and Photo candidates are registered but disabled.
+- Workflow definitions reject unknown dependencies and cycles.
+- Workflow creation is idempotent for an identical workflow specification and rejects changed content under the same workflow ID.
+- Local task claims are serialized, lease-bound, and protected by optimistic versions.
+- Successful dependencies release downstream tasks; failed/blocked/unknown outcomes do not.
+- Expired leases enter NEEDS_RECONCILIATION and are never automatically retried.
+- Event-chain verification detects modified event records.
+- CMS and Photo candidates remain registered but disabled.
 - CI is offline, secret-free, and runs the platform unit tests.
 - Existing specialist PRs and main remain unchanged until review.

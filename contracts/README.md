@@ -2,6 +2,7 @@
 
 These JSON Schemas are the platform boundary between AI clients, the shared core, specialist agents, and execution adapters.
 
+- `workflow.schema.json`: a workflow DAG containing specialist-owned task payloads and dependencies.
 - `task.schema.json`: a requested unit of work and its routing intent.
 - `agent.schema.json`: a specialist's identity, capabilities, lifecycle, and execution boundary.
 - `artifact.schema.json`: a reference to an output/source artifact with provenance and integrity metadata.
@@ -15,4 +16,5 @@ These JSON Schemas are the platform boundary between AI clients, the shared core
 3. An approval reference is not a permission by itself. The specialist executor must verify issuer trust, exact scope, expiry, revocation, target, and its own account permissions.
 4. A task's `requested_by` identifies the caller/runtime. It does not grant the caller authority.
 5. Unknown fields may be rejected by a receiving specialist. Do not silently reinterpret unsupported task types or capabilities.
-6. These schemas standardize envelopes; they do not replace specialist-specific validation or source-of-truth workflow rules.
+6. Workflow dependencies must be acyclic and refer to tasks in the same workflow.
+7. These schemas standardize envelopes; they do not replace specialist-specific validation or source-of-truth workflow rules.
