@@ -169,6 +169,8 @@ class StateStore:
     def _validate_definition(definition: dict[str, Any]) -> tuple[str, list[dict[str, Any]], str]:
         if not isinstance(definition, dict):
             raise ValueError("WORKFLOW_DEFINITION_NOT_OBJECT")
+        if set(definition) - {"schema_version", "workflow_id", "tasks"}:
+            raise ValueError("UNKNOWN_WORKFLOW_DEFINITION_FIELDS")
         if definition.get("schema_version") != "1.0":
             raise ValueError("UNSUPPORTED_WORKFLOW_SCHEMA")
         workflow_id = definition.get("workflow_id")

@@ -9,15 +9,6 @@
   "properties": {
     "schema_version": { "const": "1.0" },
     "workflow_id": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "requested_by": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["client_id", "runtime"],
-      "properties": {
-        "client_id": { "type": "string", "minLength": 1 },
-        "runtime": { "type": "string", "enum": ["chatgpt", "claude", "codex", "human", "service", "other"] }
-      }
-    },
     "tasks": {
       "type": "array",
       "minItems": 1,
@@ -36,6 +27,5 @@
         }
       }
     },
-    "correlation_id": { "type": "string" }
   }
 }

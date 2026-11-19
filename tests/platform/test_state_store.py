@@ -58,9 +58,10 @@ class StateStoreTests(unittest.TestCase):
 
     def test_identical_workflow_creation_is_idempotent(self):
         first = self.store.create_workflow(definition())
+        event_count = len(self.store.get_events("WF-1"))
         second = self.store.create_workflow(definition())
         self.assertEqual(first["spec_sha256"], second["spec_sha256"])
-        self.assertEqual(len(self.store.get_events("WF-1")), len(self.store.get_events("WF-1")))
+        self.assertEqual(len(self.store.get_events("WF-1")), event_count)
 
     def test_workflow_id_reuse_with_changed_spec_is_rejected(self):
         self.store.create_workflow(definition())
@@ -102,7 +103,7 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(affected, ["T-1"])
         self.assertEqual(self.store.get_task("T-1")["status"], "needs_reconciliation")
         self.assertEqual(self.store.list_ready_tasks("WF-1"), [])
-        with self.assertRaises(LeaseExpired):
+        with self.assertRaises(InvalidTransition):
             self.store.start_task("T-1", claimed["lease_token"])
 
     def test_reconciliation_requires_evidence_and_explicit_resolution(self):
@@ -164,7 +165,7 @@ class StateStoreTests(unittest.TestCase):
         self.store.create_workflow(definition())
         connection = sqlite3.connect(self.database)
         try:
-            connection.execute("UPDATE events SET details_json='{}' WHERE sequence=1")
+            connection.execute("UPDATE events SET details_json='{\"tampered\":true}' WHERE sequence=1")
             connection.commit()
         finally:
             connection.close()
@@ -196,6 +197,24 @@ class StateStoreTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "WORKFLOW_CYCLE_DETECTED"):
             self.store.create_workflow(cyclic)
+
+    def test_duplicate_idempotency_key_is_rejected(self):
+        invalid = {
+            "schema_version": "1.0",
+            "workflow_id": "WF-DUP-KEY",
+            "tasks": [
+                {"task_id": "A", "task_type": "a", "required_capability": "a", "idempotency_key": "same"},
+                {"task_id": "B", "task_type": "b", "required_capability": "b", "idempotency_key": "same"},
+            ],
+        }
+        with self.assertRaisesRegex(ValueError, "DUPLICATE_IDEMPOTENCY_KEY"):
+            self.store.create_workflow(invalid)
+
+    def test_unknown_workflow_fields_are_rejected(self):
+        invalid = definition()
+        invalid["unexpected"] = True
+        with self.assertRaisesRegex(ValueError, "UNKNOWN_WORKFLOW_DEFINITION_FIELDS"):
+            self.store.create_workflow(invalid)
 
     def test_unknown_dependency_is_rejected(self):
         invalid = {
