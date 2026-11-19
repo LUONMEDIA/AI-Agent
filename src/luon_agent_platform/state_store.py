@@ -174,7 +174,7 @@ class StateStore:
         if definition.get("schema_version") != "1.0":
             raise ValueError("UNSUPPORTED_WORKFLOW_SCHEMA")
         workflow_id = definition.get("workflow_id")
-        if not isinstance(workflow_id, str) or not workflow_id.strip():
+        if not isinstance(workflow_id, str) or not workflow_id.strip() or len(workflow_id) > 128:
             raise ValueError("WORKFLOW_ID_REQUIRED")
         tasks = definition.get("tasks")
         if not isinstance(tasks, list) or not tasks:
@@ -198,8 +198,8 @@ class StateStore:
                 ("TASK_ID", task_id), ("TASK_TYPE", task_type),
                 ("REQUIRED_CAPABILITY", capability),
             ):
-                if not isinstance(value, str) or not value.strip():
-                    raise ValueError(f"{field_name}_REQUIRED")
+                if not isinstance(value, str) or not value.strip() or len(value) > 128:
+                    raise ValueError(f"{field_name}_REQUIRED_OR_TOO_LONG")
             if task_id in seen_ids:
                 raise ValueError(f"DUPLICATE_TASK_ID:{task_id}")
             seen_ids.add(task_id)
@@ -277,6 +277,12 @@ class StateStore:
         reason_code: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> None:
+        if not isinstance(actor, str) or not actor.strip():
+            raise ValueError("EVENT_ACTOR_REQUIRED")
+        if not isinstance(event_type, str) or not event_type.strip():
+            raise ValueError("EVENT_TYPE_REQUIRED")
+        if details is not None and not isinstance(details, dict):
+            raise ValueError("EVENT_DETAILS_MUST_BE_OBJECT")
         previous = connection.execute(
             "SELECT sequence, event_sha256 FROM events ORDER BY sequence DESC LIMIT 1"
         ).fetchone()
@@ -416,6 +422,11 @@ class StateStore:
     def list_ready_tasks(self, workflow_id: str) -> list[dict[str, Any]]:
         connection = self._connect()
         try:
+            exists = connection.execute(
+                "SELECT 1 FROM workflows WHERE workflow_id = ?", (workflow_id,)
+            ).fetchone()
+            if not exists:
+                raise StateStoreError(f"WORKFLOW_NOT_FOUND:{workflow_id}")
             rows = connection.execute(
                 """
                 SELECT t.* FROM tasks t
@@ -462,7 +473,8 @@ class StateStore:
         expected_version: int | None = None,
         actor: str = "orchestrator",
     ) -> dict[str, Any]:
-        if not agent_id.strip() or not worker_id.strip():
+        if (not isinstance(agent_id, str) or not agent_id.strip()
+                or not isinstance(worker_id, str) or not worker_id.strip()):
             raise ValueError("AGENT_AND_WORKER_IDS_REQUIRED")
         if not isinstance(lease_seconds, int) or not 1 <= lease_seconds <= 3600:
             raise ValueError("LEASE_SECONDS_OUT_OF_RANGE")
@@ -576,7 +588,7 @@ class StateStore:
         evidence_ref: str,
         reason_code: str = "OPERATOR_UNBLOCKED",
     ) -> dict[str, Any]:
-        if not evidence_ref.strip():
+        if not isinstance(evidence_ref, str) or not evidence_ref.strip():
             raise ValueError("EVIDENCE_REFERENCE_REQUIRED")
         with self._transaction() as connection:
             row = connection.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,)).fetchone()
@@ -757,7 +769,10 @@ class StateStore:
         try:
             rows = connection.execute("SELECT * FROM events ORDER BY sequence").fetchall()
             previous_hash = None
+            previous_sequence = 0
             for row in rows:
+                if row["sequence"] != previous_sequence + 1:
+                    return {"valid": False, "events_checked": row["sequence"], "failed_sequence": row["sequence"]}
                 record = {
                     "sequence": row["sequence"],
                     "event_id": row["event_id"],
@@ -778,6 +793,7 @@ class StateStore:
                         "failed_sequence": row["sequence"],
                     }
                 previous_hash = row["event_sha256"]
+                previous_sequence = row["sequence"]
             return {"valid": True, "events_checked": len(rows), "failed_sequence": None}
         finally:
             connection.close()

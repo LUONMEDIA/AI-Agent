@@ -129,6 +129,7 @@ class StateStoreTests(unittest.TestCase):
             "T-1", claimed["lease_token"], "needs_reconciliation",
             reason_code="UNKNOWN_OUTCOME",
         )
+        self.assertEqual(self.store.get_task("T-2")["status"], "pending")
         self.store.resolve_reconciliation(
             "T-1", "succeeded", "operator", "evidence://remote-readback"
         )

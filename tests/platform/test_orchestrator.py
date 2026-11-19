@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from luon_agent_platform import OrchestrationError, StateStore, WorkflowOrchestrator, load_registry
+from luon_agent_platform import OrchestrationError, StateStore, StateStoreError, WorkflowOrchestrator, load_registry
 
 
 def workflow():
@@ -55,6 +55,11 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(all(item["status_unchanged"] for item in plan["unroutable"]))
         self.assertFalse(plan["external_execution_performed"])
         self.assertEqual(self.store.get_task("CMS-1")["status"], "ready")
+
+    def test_planning_unknown_workflow_fails_explicitly(self):
+        orchestrator = WorkflowOrchestrator(self.store, active_registry())
+        with self.assertRaises(StateStoreError):
+            orchestrator.plan_dispatch("DOES-NOT-EXIST")
 
     def test_claim_routes_only_registered_active_capability(self):
         definition = {
