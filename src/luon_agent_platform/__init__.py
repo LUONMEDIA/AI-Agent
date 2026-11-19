@@ -1,5 +1,16 @@
 """Provider-neutral LUON AI-Agent Platform foundation."""
 
+from .execution import (
+    AdapterExecutionError,
+    AdapterNotInstalled,
+    AdapterRegistry,
+    AdapterRegistryError,
+    AdapterResult,
+    AgentAdapter,
+    TaskContext,
+    TaskNotDispatchable,
+    TaskRunner,
+)
 from .orchestrator import OrchestrationError, WorkflowOrchestrator
 from .registry import RegistryError, find_agent, load_registry, validate_registry
 from .router import RouteError, route_task
@@ -13,6 +24,12 @@ from .state_store import (
 )
 
 __all__ = [
+    "AdapterExecutionError",
+    "AdapterNotInstalled",
+    "AdapterRegistry",
+    "AdapterRegistryError",
+    "AdapterResult",
+    "AgentAdapter",
     "InvalidTransition",
     "LeaseExpired",
     "OrchestrationError",
@@ -20,6 +37,9 @@ __all__ = [
     "RouteError",
     "StateStore",
     "StateStoreError",
+    "TaskContext",
+    "TaskNotDispatchable",
+    "TaskRunner",
     "VersionConflict",
     "WorkflowConflict",
     "WorkflowOrchestrator",

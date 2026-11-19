@@ -8,6 +8,7 @@ These JSON Schemas are the platform boundary between AI clients, the shared core
 - `artifact.schema.json`: a reference to an output/source artifact with provenance and integrity metadata.
 - `approval.schema.json`: an independently issued, narrowly scoped authorization reference.
 - `event.schema.json`: a normalized lifecycle/audit event.
+- `execution_result.schema.json`: a specialist adapter's normalized outcome.
 
 ## Contract rules
 

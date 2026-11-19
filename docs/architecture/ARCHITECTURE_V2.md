@@ -28,8 +28,9 @@ Responsibilities:
 - Claim work through short-lived local leases and enforce task lifecycle transitions.
 - Correlate task, artifact, approval, and audit references.
 - Detect event-history tampering and expose explicit reconciliation states.
+- Invoke only explicitly injected, active workflow-agent adapters through a normalized synchronous runner.
 
-The current implementation includes registry validation, deterministic routing, a local SQLite state store, dependency scheduling, local task leases, and a hash-chained event history. It does not include distributed coordination, provider invocation, centralized authorization, or remote dispatch workers.
+The current implementation includes registry validation, deterministic routing, a local SQLite state store, dependency scheduling, local task leases, a hash-chained event history, and an in-process adapter contract/runner. It does not include distributed coordination, provider-specific invocation, centralized authorization, or remote dispatch workers.
 
 ### C. Specialist agents and applications
 
@@ -95,7 +96,7 @@ The foundation registry currently records:
 - `cttdt.cms-batch`: candidate, disabled; references draft PR #1.
 - `luon.photo-batch`: candidate, disabled; references PR #3 and is classified as an application.
 
-Neither is dispatchable through the new router.
+Neither is dispatchable through the new router. The adapter registry also rejects Photo Batch as a workflow agent because it is classified as an application.
 
 ## 7. Current repository facts and integration constraints
 
@@ -111,6 +112,7 @@ This foundation deliberately does not merge, rebase, or rewrite those PRs. Their
 ## 8. Deliberately not implemented yet
 
 - Provider-specific ChatGPT/Claude/Codex adapters and actual remote dispatch.
+- Any active specialist adapter in the current registry; therefore the runner has no real business agent to invoke.
 - Shared multi-host database/queue, distributed locks, or distributed scheduler.
 - Central identity, policy decision point, approval-signature verification service, or key lifecycle.
 - External append-only audit sink and independently signed audit checkpoints.
@@ -132,5 +134,7 @@ These require explicit technical choices, external credentials/permissions, and 
 - Expired leases enter NEEDS_RECONCILIATION and are never automatically retried.
 - Event-chain verification detects modified event records.
 - CMS and Photo candidates remain registered but disabled.
+- Adapter loading rejects disabled candidates and application-only registrations.
+- Unexpected adapter exceptions and invalid result envelopes become NEEDS_RECONCILIATION.
 - CI is offline, secret-free, and runs the platform unit tests.
 - Existing specialist PRs and main remain unchanged until review.

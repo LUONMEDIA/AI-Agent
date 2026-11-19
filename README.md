@@ -13,7 +13,7 @@ A provider-neutral foundation for coordinating specialist workflows across ChatG
 ## What this foundation contains
 
 - Versioned JSON contracts for workflows, tasks, agent registrations, artifacts, scoped approvals, and lifecycle events.
-- A standard-library Python core for registry validation, deterministic capability routing, local SQLite workflow state, dependency scheduling, task leases, and reconciliation.
+- A standard-library Python core for registry validation, deterministic capability routing, local SQLite workflow state, dependency scheduling, task leases, reconciliation, and a pluggable in-process adapter runner.
 - A hash-chained event history that can detect accidental or unauthorized record changes when verified against a trusted checkpoint.
 - An explicit registry that records current CMS and Photo work as disabled candidates.
 - Architecture, security boundaries, and a migration plan that preserve the existing specialist work.
@@ -37,7 +37,7 @@ registry = load_registry(Path("config/agents.json"))
 orchestrator = WorkflowOrchestrator(store, registry)
 ```
 
-Submit a workflow definition using the contract in `contracts/workflow.schema.json`. The orchestrator can plan and claim tasks only for a unique active capability match. A claim creates a time-limited local lease; it does not invoke an AI provider or external system.
+Submit a workflow definition using the contract in `contracts/workflow.schema.json`. The orchestrator can plan and claim tasks only for a unique active capability match. A claim creates a time-limited local lease. The TaskRunner invokes only an explicitly injected adapter whose registry entry is active and classified as a workflow agent.
 
 The router intentionally refuses to route to disabled/candidate agents. Expired worker leases move to `needs_reconciliation`; they are never automatically requeued.
 
@@ -45,6 +45,7 @@ The router intentionally refuses to route to disabled/candidate agents. Expired 
 
 - [Architecture V2](docs/architecture/ARCHITECTURE_V2.md)
 - [State and orchestration](docs/architecture/STATE_AND_ORCHESTRATION.md)
+- [Specialist adapter contract](docs/architecture/AGENT_ADAPTER_CONTRACT.md)
 - [Integration matrix](docs/architecture/INTEGRATION_MATRIX.md)
 - [Contracts](contracts/README.md)
 - [Global agent guidance](AGENTS.md)
@@ -53,7 +54,7 @@ The router intentionally refuses to route to disabled/candidate agents. Expired 
 
 - SQLite state is for a private **single-host** runtime only. It is not a distributed lock or multi-host queue.
 - Hash chaining is tamper-evident, not immutable or a substitute for a signed external audit checkpoint.
-- There is no provider adapter, background worker, remote dispatcher, central identity service, approval-signature verifier, or production connector in this package.
+- There is no ChatGPT / Claude / Codex provider-specific adapter, background worker, remote dispatcher, central identity service, approval-signature verifier, or production connector in this package. The in-process adapter interface is not a sandbox.
 - The state store does not grant permission to perform any specialist action.
 
 ## Safety
