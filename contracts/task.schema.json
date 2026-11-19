@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luonmedia.com/ai-agent/contracts/task.schema.json",
+  "title": "LUON Agent Task",
+  "description": "Provider-neutral task envelope. Payload semantics remain specialist-owned.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "task_id", "task_type", "required_capability", "requested_by", "payload"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "task_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "task_type": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "required_capability": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "target_agent": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "requested_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["client_id", "runtime"],
+      "properties": {
+        "client_id": { "type": "string", "minLength": 1 },
+        "runtime": { "type": "string", "enum": ["chatgpt", "claude", "codex", "human", "service", "other"] },
+        "principal_ref": { "type": "string" }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "payload": { "type": "object" },
+    "artifact_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "constraints": { "type": "object" },
+    "approval_ref": { "type": "string" },
+    "correlation_id": { "type": "string" }
+  }
+}

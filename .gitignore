@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Secrets and private operational state (never commit)
+.env
+.env.*
+!.env.example
+.auth/
+private/
+secrets/
+runtime/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+*.db-wal
+*.db-shm
+*storage_state*.json
+*approval*.private.json
+*.pem
+*.key
+*.p12
+*.pdf
+*.docx
+
+# Tooling
+.DS_Store
+node_modules/
+dist/
+build/

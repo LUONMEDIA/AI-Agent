@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luonmedia.com/ai-agent/contracts/execution_result.schema.json",
+  "title": "LUON Agent Adapter Result",
+  "description": "Outcome envelope returned by a trusted specialist adapter. It does not grant authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["outcome"],
+  "properties": {
+    "outcome": { "type": "string", "enum": ["succeeded", "failed", "blocked", "needs_reconciliation"] },
+    "reason_code": { "type": "string", "minLength": 1 },
+    "details": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "enum": ["failed", "blocked", "needs_reconciliation"] } } },
+      "then": { "required": ["reason_code"] }
+    }
+  ]
+}

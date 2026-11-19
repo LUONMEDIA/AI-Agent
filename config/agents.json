@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "registry_version": "2.0.0-foundation",
+  "agents": [
+    {
+      "agent_id": "cttdt.cms-batch",
+      "display_name": "Khánh Hòa CMS Batch Agent",
+      "kind": "workflow_agent",
+      "version": "0.1.0",
+      "status": "candidate",
+      "enabled": false,
+      "capabilities": ["cms.document.prepare", "cms.document.submit.step1"],
+      "execution_boundary": {
+        "mode": "staging_only",
+        "production_mutation_allowed": false,
+        "allowed_targets": [],
+        "notes": "PR #1 is a draft, unmerged specialist implementation. Offline synthetic tests are not proof of authenticated staging acceptance."
+      },
+      "integration": {
+        "repository_branch": "feat/cms-batch-agent-safety-first",
+        "pull_request": 1,
+        "state": "not_merged",
+        "staging_verified": false
+      },
+      "owner": "cttdt"
+    },
+    {
+      "agent_id": "luon.photo-batch",
+      "display_name": "Lượn Photo Batch",
+      "kind": "application",
+      "version": "0.1.0",
+      "status": "candidate",
+      "enabled": false,
+      "capabilities": ["photo.batch.edit", "photo.batch.export"],
+      "execution_boundary": {
+        "mode": "local",
+        "production_mutation_allowed": false,
+        "allowed_targets": [],
+        "notes": "PR #3 is a standalone browser application. It is not yet registered as an executable AI workflow agent."
+      },
+      "integration": {
+        "repository_branch": "luon-photo-batch-v0.1",
+        "pull_request": 3,
+        "state": "not_merged",
+        "staging_verified": false
+      },
+      "owner": "luon-media"
+    }
+  ]
+}

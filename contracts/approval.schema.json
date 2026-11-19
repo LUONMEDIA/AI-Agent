@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luonmedia.com/ai-agent/contracts/approval.schema.json",
+  "title": "LUON Scoped Approval Reference",
+  "description": "Envelope for an independently issued authorization. Verification is performed by the target executor.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approval_id", "issuer", "subject_ref", "actions", "scope", "issued_at", "expires_at", "signature"],
+  "properties": {
+    "approval_id": { "type": "string", "minLength": 1 },
+    "issuer": { "type": "string", "minLength": 1 },
+    "subject_ref": { "type": "string", "minLength": 1 },
+    "actions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true },
+    "scope": {
+      "type": "object",
+      "required": ["target", "resource_fingerprints"],
+      "properties": {
+        "target": { "type": "string", "minLength": 1 },
+        "resource_fingerprints": { "type": "object", "additionalProperties": { "type": "string" } },
+        "constraints": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "revocation_ref": { "type": "string" },
+    "signature": {
+      "type": "object",
+      "required": ["algorithm", "key_id", "value"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "key_id": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}
