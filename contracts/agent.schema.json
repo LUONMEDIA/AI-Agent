@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luonmedia.com/ai-agent/contracts/agent.schema.json",
+  "title": "LUON Specialist Registration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id", "display_name", "kind", "version", "status", "enabled", "capabilities", "execution_boundary"],
+  "properties": {
+    "agent_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]+$" },
+    "display_name": { "type": "string", "minLength": 1 },
+    "kind": { "type": "string", "enum": ["workflow_agent", "application", "service"] },
+    "version": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["planned", "candidate", "active", "deprecated"] },
+    "enabled": { "type": "boolean" },
+    "capabilities": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "execution_boundary": {
+      "type": "object",
+      "required": ["mode", "production_mutation_allowed"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["read_only", "local", "staging_only", "scoped_live"] },
+        "production_mutation_allowed": { "type": "boolean" },
+        "allowed_targets": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "integration": { "type": "object" },
+    "owner": { "type": "string" }
+  }
+}

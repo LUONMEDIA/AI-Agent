@@ -1,0 +1,45 @@
+name: Platform foundation CI
+
+on:
+  pull_request:
+    paths:
+      - "src/luon_agent_platform/**"
+      - "contracts/**"
+      - "config/agents.json"
+      - "tests/platform/**"
+      - ".github/workflows/platform-ci.yml"
+  push:
+    branches: ["main", "feat/agent-platform-v2-foundation"]
+    paths:
+      - "src/luon_agent_platform/**"
+      - "contracts/**"
+      - "config/agents.json"
+      - "tests/platform/**"
+      - ".github/workflows/platform-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  platform-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate JSON files
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          paths = list(Path("contracts").glob("*.schema.json")) + [Path("config/agents.json")]
+          for path in paths:
+              json.loads(path.read_text(encoding="utf-8"))
+          print(f"Validated {len(paths)} JSON files")
+          PY
+      - name: Run platform unit tests
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests/platform -v
