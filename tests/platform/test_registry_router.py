@@ -41,7 +41,9 @@ class RegistryTests(unittest.TestCase):
     def test_load_repository_registry(self):
         root = Path(__file__).resolve().parents[2]
         registry = load_registry(root / "config" / "agents.json")
-        self.assertEqual(len(registry["agents"]), 2)
+        ids = {agent["agent_id"] for agent in registry["agents"]}
+        self.assertIn("master.drive-current-read", ids)
+        self.assertEqual(len(ids), len(registry["agents"]))
         self.assertTrue(all(not agent["enabled"] for agent in registry["agents"]))
 
     def test_duplicate_ids_are_rejected(self):

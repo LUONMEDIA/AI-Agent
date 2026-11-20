@@ -24,7 +24,9 @@ class ContractFileTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         registry = json.loads((root / "config" / "agents.json").read_text(encoding="utf-8"))
         self.assertEqual(registry["schema_version"], 1)
-        self.assertEqual(len(registry["agents"]), 2)
+        ids = {agent["agent_id"] for agent in registry["agents"]}
+        self.assertTrue({"cttdt.cms-batch", "luon.photo-batch", "master.drive-current-read"} <= ids)
+        self.assertTrue(all(not agent["enabled"] for agent in registry["agents"]))
 
 
 if __name__ == "__main__":
