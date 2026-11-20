@@ -140,6 +140,23 @@ class BridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(BridgeError, "MANIFEST_ROUTE_MISSING_OR_DUPLICATE"):
             self.bridge.resolve()
 
+    def test_source_revision_change_during_export_blocks(self):
+        original = self.fake
+
+        def racing_transport(url, headers):
+            output = original(url, headers)
+            if "/export?" in url:
+                original.version += 1
+            return output
+
+        bridge = DriveCurrentBridge(DriveReader("synthetic-token", racing_transport), self.config)
+        with self.assertRaisesRegex(BridgeError, "SOURCE_CHANGED_DURING_READ"):
+            bridge.resolve("CODEX")
+
+    def test_rejects_non_google_api_endpoint(self):
+        with self.assertRaisesRegex(BridgeError, "UNEXPECTED_API_ENDPOINT"):
+            self.reader._get("https://example.com/drive/v3/files/anything")
+
     def test_missing_authentication_blocks(self):
         with self.assertRaisesRegex(BridgeError, "AUTH_NOT_CONFIGURED"):
             DriveReader("")
