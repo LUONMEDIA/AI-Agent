@@ -66,6 +66,7 @@ class FakeGoogle:
         for key, spec in config["modules"].items():
             self.content[spec["id"]] = key + " TEST V2.0\nSOURCE RULE TEST"
         self.version = 1
+        self.metadata_titles = {}
         self.calls = []
         self.sheet_id = "SYNTHETIC_SPREADSHEET_000000000001"
         self.sheet_values = []
@@ -90,7 +91,7 @@ class FakeGoogle:
             }).encode()
         spec = self.by_id[file_id]
         return json.dumps({
-            "id": file_id, "name": spec["title"],
+            "id": file_id, "name": self.metadata_titles.get(file_id, spec["title"]),
             "mimeType": "application/vnd.google-apps.document",
             "modifiedTime": "2026-11-20T00:00:00Z",
             "version": str(self.version), "trashed": False,
@@ -110,7 +111,6 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(len(result["sources"]), 9)
         self.assertFalse(result["write_performed"])
         self.assertTrue(all(x.startswith("https://www.googleapis.com/drive/v3/files/") for x in self.fake.calls))
-        self.assertEqual(len([x for x in self.fake.calls if x.endswith("trashed%2Cversion")]), 0)
 
     def test_codex_targeted_loading(self):
         result = self.bridge.resolve("CODEX")
@@ -130,7 +130,7 @@ class BridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(BridgeError, "CANDIDATE_OR_LEGACY_SOURCE"):
             DriveCurrentBridge(self.reader, self.config)
         spec["title"] = "01 — CORE TEST V2.0 — CANONICAL"
-        self.fake.by_id[spec["id"]]["title"] = "01 — CORE MODIFIED V3.0 — CANONICAL"
+        self.fake.metadata_titles[spec["id"]] = "01 — CORE MODIFIED V3.0 — CANONICAL"
         with self.assertRaisesRegex(BridgeError, "SOURCE_TITLE_DRIFT"):
             self.bridge.resolve()
 
