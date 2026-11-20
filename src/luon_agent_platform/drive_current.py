@@ -12,8 +12,8 @@ import json
 import re
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
-from urllib.request import Request, urlopen
+from urllib.parse import quote, urlencode, urlsplit
+from urllib.request import Request, build_opener, HTTPRedirectHandler
 
 from .execution import AdapterResult, TaskContext
 
@@ -73,6 +73,13 @@ def validate_config(config: dict[str, Any]) -> None:
             raise BridgeError("CANDIDATE_OR_LEGACY_SOURCE")
 
 
+class _NoRedirect(HTTPRedirectHandler):
+    """Do not forward OAuth credentials to an unverified redirect target."""
+
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        raise BridgeError("UNEXPECTED_PROVIDER_REDIRECT")
+
+
 class DriveReader:
     """OAuth2 Drive v3 GET/export only; injected transport enables offline tests.
 
@@ -88,18 +95,25 @@ class DriveReader:
     ):
         if not isinstance(access_token, str) or not access_token.strip():
             raise BridgeError("AUTH_NOT_CONFIGURED")
+        if any(char in access_token for char in ("\r", "\n")):
+            raise BridgeError("INVALID_AUTH_HEADER")
         self._token = access_token
         self._transport = transport
         self._timeout = timeout
 
     def _get(self, url: str) -> bytes:
+        address = urlsplit(url)
+        if address.scheme != "https" or address.hostname not in {
+            "www.googleapis.com", "sheets.googleapis.com"
+        }:
+            raise BridgeError("UNEXPECTED_API_ENDPOINT")
         headers = {"Authorization": "Bearer " + self._token, "Accept": "application/json, text/plain"}
         try:
             if self._transport is not None:
                 result = self._transport(url, headers)
             else:
                 request = Request(url, headers=headers, method="GET")
-                with urlopen(request, timeout=self._timeout) as response:
+                with build_opener(_NoRedirect()).open(request, timeout=self._timeout) as response:
                     result = response.read(2_000_001)
             if not isinstance(result, bytes) or len(result) > 2_000_000:
                 raise BridgeError("SOURCE_TOO_LARGE")
@@ -143,6 +157,9 @@ class DriveReader:
             raise BridgeError("SOURCE_TEXT_INVALID") from None
         if not content:
             raise BridgeError("SOURCE_EMPTY")
+        after = self.metadata(file_id)
+        if (str(after["version"]), after["modifiedTime"]) != (str(meta["version"]), meta["modifiedTime"]):
+            raise BridgeError("SOURCE_CHANGED_DURING_READ")
         return meta, content
 
 
