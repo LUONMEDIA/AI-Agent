@@ -9,7 +9,10 @@
       "version": "0.1.0",
       "status": "candidate",
       "enabled": false,
-      "capabilities": ["cms.document.prepare", "cms.document.submit.step1"],
+      "capabilities": [
+        "cms.document.prepare",
+        "cms.document.submit.step1"
+      ],
       "execution_boundary": {
         "mode": "staging_only",
         "production_mutation_allowed": false,
@@ -31,7 +34,10 @@
       "version": "0.1.0",
       "status": "candidate",
       "enabled": false,
-      "capabilities": ["photo.batch.edit", "photo.batch.export"],
+      "capabilities": [
+        "photo.batch.edit",
+        "photo.batch.export"
+      ],
       "execution_boundary": {
         "mode": "local",
         "production_mutation_allowed": false,
@@ -45,6 +51,30 @@
         "staging_verified": false
       },
       "owner": "luon-media"
+    },
+    {
+      "agent_id": "master.drive-current-read",
+      "display_name": "Google Drive CURRENT Authority Read Adapter",
+      "kind": "workflow_agent",
+      "version": "0.1.0",
+      "status": "candidate",
+      "enabled": false,
+      "capabilities": [
+        "master.authority.read"
+      ],
+      "execution_boundary": {
+        "mode": "read_only",
+        "production_mutation_allowed": false,
+        "allowed_targets": [],
+        "notes": "Read-only Drive API adapter; requires separately authorized private OAuth and exact CURRENT manifest mapping. No production dispatch/cutover authorized."
+      },
+      "integration": {
+        "repository_branch": "feat/drive-current-bridge-20261120",
+        "state": "candidate_not_activated",
+        "live_service_credentials_provisioned": false,
+        "live_accepted": false
+      },
+      "owner": "master-ai"
     }
   ]
 }
