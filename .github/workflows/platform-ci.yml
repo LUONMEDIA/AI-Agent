@@ -39,6 +39,8 @@ jobs:
               json.loads(path.read_text(encoding="utf-8"))
           print(f"Validated {len(paths)} JSON files")
           PY
+      - name: Python syntax and CLI checks
+        run: python -m compileall -q src scripts/drive_current_readback.py tests/platform
       - name: Run platform unit tests
         env:
           PYTHONPATH: src
